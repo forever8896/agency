@@ -55,13 +55,10 @@ fi
 AGENT_PROMPT="$AGENT_DIR/AGENT.md"
 AGENT_GOALS="$AGENT_DIR/goals.md"
 AGENT_STATUS="$AGENT_DIR/status.md"
-LOG_FILE="$AGENCY_DIR/logs/${AGENT_NAME}.log"
 COLOR="${AGENT_COLORS[$AGENT_NAME]:-$NC}"
 
-mkdir -p "$AGENCY_DIR/logs"
-
 log() {
-    echo -e "${COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] [$AGENT_NAME]${NC} $1" | tee -a "$LOG_FILE"
+    echo -e "${COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] [$AGENT_NAME]${NC} $1"
 }
 
 has_work() {
@@ -110,7 +107,7 @@ main() {
 
             PROMPT=$(build_prompt)
 
-            claude -p "$PROMPT" --dangerously-skip-permissions 2>&1 | tee -a "$LOG_FILE"
+            claude -p "$PROMPT" --dangerously-skip-permissions
 
             EXIT_CODE=$?
             log "Session ended (exit: $EXIT_CODE). Checking for more work in 10s..."

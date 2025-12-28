@@ -14,7 +14,7 @@ set -e
 
 # Configure this to your installation path
 AGENCY_DIR="${AGENCY_DIR:-$(dirname "$(realpath "$0")")}"
-PID_DIR="$AGENCY_DIR/logs/pids"
+PID_DIR="$AGENCY_DIR/.pids"
 AGENTS=("dispatcher" "architect" "developer" "qa" "reviewer")
 
 # Colors
@@ -53,7 +53,7 @@ start_agent() {
     fi
 
     echo -e "${GREEN}[$agent]${NC} Starting..."
-    nohup "$AGENCY_DIR/run-agent.sh" "$agent" > "$AGENCY_DIR/logs/${agent}.log" 2>&1 &
+    nohup "$AGENCY_DIR/run-agent.sh" "$agent" > /dev/null 2>&1 &
     echo $! > "$pid_file"
     echo -e "${GREEN}[$agent]${NC} Started (PID: $!)"
 }
@@ -109,7 +109,6 @@ start_all() {
     echo -e "Add requests to: ${CYAN}$AGENCY_DIR/inbox.md${NC}"
     echo -e "Watch progress on: ${CYAN}$AGENCY_DIR/board.md${NC}"
     echo ""
-    echo -e "View logs: tail -f $AGENCY_DIR/logs/*.log"
     echo -e "Stop all: $0 stop"
 }
 

@@ -72,9 +72,6 @@ EOF
 ./agency.sh start
 
 # 3. Watch progress
-tail -f logs/*.log
-
-# Or watch the board
 watch cat board.md
 ```
 
@@ -106,7 +103,6 @@ agency/
 ├── handoffs/             # Inter-agent communication
 ├── projects/             # Project specs and docs
 ├── knowledge/            # Shared context, decisions
-├── logs/                 # Session logs
 ├── agency.sh             # Main orchestrator
 └── run-agent.sh          # Individual agent runner
 ```
@@ -147,7 +143,6 @@ The agent prompts are designed to be modified. Experiment with different instruc
 - **board.md** - See tasks flow through columns
 - **agents/*/status.md** - What each agent is thinking
 - **handoffs/** - Communication between agents
-- **logs/*.log** - Full Claude session output
 
 ## Known Limitations
 
@@ -161,9 +156,8 @@ The agent prompts are designed to be modified. Experiment with different instruc
 
 1. **Be specific** - Vague requests lead to vague results
 2. **Start small** - Test with simple tasks first
-3. **Watch the logs** - You'll learn a lot about how agents think
-4. **Intervene** - Edit any file to redirect work
-5. **Monitor costs** - Check your Claude usage dashboard
+3. **Intervene** - Edit any file to redirect work
+4. **Monitor costs** - Check your Claude usage dashboard
 
 ## Why File-Based?
 
