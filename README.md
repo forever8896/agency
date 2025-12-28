@@ -44,7 +44,7 @@ Use at your own risk. Monitor your usage.
 
 ```bash
 # Clone the repo
-git clone https://github.com/YOUR_USERNAME/agency.git
+git clone https://github.com/forever8896/agency.git
 cd agency
 
 # Make scripts executable
@@ -180,4 +180,4 @@ MIT - do whatever you want with this.
 
 ## Credits
 
-Inspired by the experiments of [Denislav Gavrilov](https://twitter.com/AiDenislav) and many others exploring autonomous AI systems.
+Inspired by the experiments of [Denislav Gavrilov](https://x.com/kuberdenis) and many others exploring autonomous AI systems.
