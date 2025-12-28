@@ -50,9 +50,6 @@ cd agency
 # Make scripts executable
 chmod +x agency.sh run-agent.sh
 
-# Edit the AGENCY_DIR path in both scripts to point to your installation
-# Default is ~/agency - change if needed
-
 # Optional: create global command
 sudo ln -sf $(pwd)/agency.sh /usr/local/bin/agency
 ```

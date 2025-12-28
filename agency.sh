@@ -12,7 +12,7 @@
 
 set -e
 
-# Configure this to your installation path
+# Auto-detect installation path (override with AGENCY_DIR env var if needed)
 AGENCY_DIR="${AGENCY_DIR:-$(dirname "$(realpath "$0")")}"
 PID_DIR="$AGENCY_DIR/.pids"
 AGENTS=("dispatcher" "architect" "developer" "qa" "reviewer")
