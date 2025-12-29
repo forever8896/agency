@@ -1,169 +1,314 @@
-# The Agency
+# The Agency v2: Squad Model
 
-An autonomous multi-agent development team powered by Claude Code.
+An autonomous multi-agent development team powered by Claude Code - redesigned based on data-driven research.
 
-Drop a request in the inbox. Watch five AI agents research, design, build, test, and ship.
+## Overview
 
-## What This Is
+The Agency is a framework for running multiple AI agents as a coordinated software development team. Each agent has a specialized role (Product Owner, Tech Lead, Developers, QA, DevOps) and they communicate through shared markdown files - enabling full observability and human intervention at any point.
 
-A bash-based orchestration system that runs multiple Claude Code sessions as specialized agents. Each agent has a role, a personality, and a task queue. They communicate through markdown files.
-
-```
-You                     The Agency
- │                          │
- ├─► inbox.md              │
- │                          │
- │                Dispatcher │─► triages, assigns
- │                          │
- │                Architect  │─► designs, specs
- │                          │
- │                Developer  │─► builds code
- │                          │
- │                QA         │─► tests, verifies
- │                          │
- │                Reviewer   │─► approves, ships
- │                          │
- │◄── board.md ─────────────┤
-```
-
-## Disclaimer
-
-**This is an experiment, not production software.**
-
-Token usage is high. The agents work, but coordination overhead adds up. I'm sharing this so others can experiment with their own setups. I'll keep iterating on mine to find what makes sense in terms of speed, cost, and coordination.
-
-Use at your own risk. Monitor your usage.
+**Key Features:**
+- **Autonomous operation** - Agents poll for work and execute independently
+- **Human-readable state** - All coordination happens via markdown files you can read/edit
+- **Token efficient** - Stateless agents spawn fresh for each task, no accumulated context
+- **Research-backed** - Team structure based on DORA, Spotify, and Amazon research
+- **Git-friendly** - Templates tracked in git, runtime state gitignored
 
 ## Requirements
 
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated
 - Bash shell (Linux/macOS/WSL)
-- A Claude subscription (for `--dangerously-skip-permissions` to work economically)
-
-## Setup
-
-```bash
-# Clone the repo
-git clone https://github.com/forever8896/agency.git
-cd agency
-
-# Make scripts executable
-chmod +x agency.sh run-agent.sh
-
-# Optional: create global command
-sudo ln -sf $(pwd)/agency.sh /usr/local/bin/agency
-```
+- Git (optional, for version control)
 
 ## Quick Start
 
 ```bash
-# 1. Add a request
-cat >> inbox.md << 'EOF'
+# Clone the repository
+git clone https://github.com/yourusername/agency.git
+cd agency
+
+# Add your first request
+cat >> .agency/data/inbox.md << 'EOF'
 ## NEW: Build a simple CLI todo app
 **Priority:** high
 **Description:** Command-line todo app with add, list, complete, delete
-**Context:** Use Python, keep it simple, single file
+**Context:** Use Python, keep it simple
 EOF
 
-# 2. Start the agency
+# Start the squad
 ./agency.sh start
 
-# 3. Watch progress
-watch cat board.md
+# Watch live activity (no token usage)
+./agency.sh watch
+
+# Or check status
+./agency.sh status
+```
+
+## How It Works
+
+### File Structure
+
+```
+agency/
+├── inbox.md              # Template: request format documentation
+├── backlog.md            # Template: workflow documentation
+├── board.md              # Template: kanban structure
+├── standup.md            # Template: standup format
+├── metrics.md            # Template: DORA metrics explanation
+│
+├── .agency/
+│   └── data/             # Runtime state (gitignored)
+│       ├── inbox.md      # Active requests
+│       ├── backlog.md    # Work items in progress
+│       ├── board.md      # Current kanban state
+│       ├── standup.md    # Agent status updates
+│       └── metrics.md    # Tracked metrics
+│
+├── agents/               # Agent definitions (AGENT.md prompts)
+│   ├── product-owner/
+│   ├── tech-lead/
+│   ├── dev-alpha/
+│   ├── dev-beta/
+│   ├── dev-gamma/
+│   ├── qa/
+│   └── devops/
+│
+├── handoffs/             # Inter-agent communication (gitignored)
+├── agency.sh             # Main orchestrator
+└── run-agent.sh          # Individual agent runner
+```
+
+### Templates vs Runtime Data
+
+The Agency separates **templates** (tracked in git) from **runtime data** (gitignored):
+
+| Location | Purpose | Git Status |
+|----------|---------|------------|
+| `inbox.md` | Template showing request format | Tracked |
+| `.agency/data/inbox.md` | Your actual requests | Ignored |
+| `backlog.md` | Template showing workflow | Tracked |
+| `.agency/data/backlog.md` | Your actual work items | Ignored |
+
+**On first run**, templates are automatically copied to `.agency/data/` if no data exists. This means:
+- New users get clean templates with documentation
+- Your work state persists across sessions
+- Git stays clean - no accidental commits of work-in-progress
+
+### Workflow
+
+```
+1. You add request    →  .agency/data/inbox.md (## NEW:)
+2. PO triages         →  .agency/data/backlog.md (## READY:)
+3. Dev claims work    →  ## IN_PROGRESS: @dev-alpha
+4. Dev completes      →  ## DONE: @dev-alpha
+5. DevOps deploys     →  ## SHIPPED:
+```
+
+Work items flow through states via markdown headers:
+- `## NEW:` - Fresh request in inbox
+- `## TRIAGED:` - PO has reviewed and added context
+- `## READY:` - In backlog, available for claiming
+- `## IN_PROGRESS: @agent` - Being worked on
+- `## DONE: @agent` - Completed, awaiting deployment
+- `## SHIPPED:` - Live in production
+
+## Configuration
+
+Configure via environment variables:
+
+```bash
+# Agency files location (default: script directory)
+export AGENCY_DIR=~/path/to/agency
+
+# Runtime data location (default: $AGENCY_DIR/.agency/data)
+export DATA_DIR=~/path/to/data
+
+# Where agents create code projects (default: ~/projects)
+export PROJECTS_DIR=~/code
+
+# Polling interval in seconds (default: 30)
+export POLL_INTERVAL=60
+
+# Start with custom config
+./agency.sh start
+```
+
+### Obsidian Integration
+
+Point `AGENCY_DIR` to your Obsidian vault for seamless note-taking integration:
+
+```bash
+AGENCY_DIR=~/obsidian/Agency ./agency.sh start
 ```
 
 ## Commands
 
 ```bash
-./agency.sh start      # Start all agents in background
-./agency.sh stop       # Stop all agents
-./agency.sh status     # Show what each agent is doing
-./agency.sh dispatcher # Run single agent in foreground (for debugging)
+./agency.sh start       # Start all agents in background
+./agency.sh stop        # Stop all agents
+./agency.sh status      # Show agent status and DORA metrics
+./agency.sh watch       # Live activity log (no token usage)
+./agency.sh <agent>     # Run single agent in foreground (for debugging)
 ```
 
-## Directory Structure
+Available agents: `product-owner`, `tech-lead`, `dev-alpha`, `dev-beta`, `dev-gamma`, `qa`, `devops`
+
+## The Squad
 
 ```
-agency/
-├── inbox.md              # Drop requests here (## NEW: ...)
-├── board.md              # Kanban view of all work
-├── standup.md            # Agent status summary
-├── agents/
-│   ├── dispatcher/
-│   │   ├── AGENT.md      # Role definition and instructions
-│   │   ├── goals.md      # Task queue (## PENDING: ...)
-│   │   └── status.md     # Current status
-│   ├── architect/
-│   ├── developer/
-│   ├── qa/
-│   └── reviewer/
-├── handoffs/             # Inter-agent communication
-├── projects/             # Project specs and docs
-├── knowledge/            # Shared context, decisions
-├── agency.sh             # Main orchestrator
-└── run-agent.sh          # Individual agent runner
+┌────────────────────────────────────────────────────────────────┐
+│                        THE AGENCY v2                           │
+│                      Squad Model                               │
+├────────────────────────────────────────────────────────────────┤
+│                                                                │
+│   ┌─────────────┐                                              │
+│   │ Product     │─── Triages inbox, defines acceptance         │
+│   │ Owner       │    criteria, prioritizes backlog             │
+│   └─────────────┘                                              │
+│          │                                                     │
+│          ▼                                                     │
+│   ┌─────────────┐                                              │
+│   │ Tech Lead   │─── Architecture, unblocks devs,              │
+│   │             │    CAN ALSO CODE (playing coach)             │
+│   └─────────────┘                                              │
+│          │                                                     │
+│    ┌─────┼─────┐                                               │
+│    ▼     ▼     ▼                                               │
+│ ┌─────┐┌─────┐┌─────┐                                          │
+│ │Dev α││Dev β││Dev γ│─── Parallel builders, claim              │
+│ └─────┘└─────┘└─────┘    work directly, self-test              │
+│    │     │     │                                               │
+│    └─────┼─────┘                                               │
+│          │                                                     │
+│          ▼         (only if flagged)                           │
+│   ┌─────────────┐  - - - - - - - - - ┐                         │
+│   │ QA          │◄ - Security/payment │ Selective, not gate    │
+│   └─────────────┘  - - - - - - - - - ┘                         │
+│          │                                                     │
+│          ▼                                                     │
+│   ┌─────────────┐                                              │
+│   │ DevOps      │─── Deploys, monitors, tracks DORA            │
+│   └─────────────┘                                              │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘
 ```
 
-## How It Works
+## Observability
 
-1. **You** add a request to `inbox.md` with the `## NEW:` header
-2. **Dispatcher** sees it, triages, creates tasks, assigns to specialists
-3. **Architect** designs the system, writes specs, hands off to Developer
-4. **Developer** builds the code, hands off to QA
-5. **QA** tests everything, hands off to Reviewer
-6. **Reviewer** approves or sends back for changes
-7. **Board** shows the final status
+Three files to monitor your squad:
 
-Communication happens through markdown files in `handoffs/`. Each agent writes structured handoff documents explaining what they did and what the next agent needs to know.
+| File | What to Watch |
+|------|---------------|
+| `.agency/data/standup.md` | Real-time agent status, blockers |
+| `.agency/data/backlog.md` | Work states: Ready → In Progress → Done |
+| `.agency/data/metrics.md` | DORA metrics: deployment frequency, lead time |
 
-## Request Format
-
-```markdown
-## NEW: Your Request Title
-**Priority:** critical/high/medium/low
-**Description:** What you want built
-**Context:** Background, preferences, constraints
+Use watch mode for live updates without token usage:
+```bash
+./agency.sh watch
 ```
 
-## Customizing Agents
+## Research Background
 
-Edit `agents/<name>/AGENT.md` to change:
-- Personality and tone
-- Workflow rules
-- Output formats
-- What they pay attention to
+### What Changed from v1?
 
-The agent prompts are designed to be modified. Experiment with different instructions.
+| v1 Problem | Research Finding | v2 Solution |
+|------------|-----------------|-------------|
+| 1 developer | 5-6 devs per 1-2 QA is optimal | 3 developers + tech lead who can code |
+| 4 handoffs per task | Handoffs are "silent killers" | Direct claiming, 1-2 handoffs max |
+| QA gates everything | Only 20-25% of effort should be QA | Selective QA for critical paths only |
+| No real standups | Async saves ~4 hrs/week | Real async standup with blockers |
+| No metrics | DORA metrics correlate with performance | Built-in DORA tracking |
 
-## Watching Progress
+### Research Sources
 
-- **board.md** - See tasks flow through columns
-- **agents/*/status.md** - What each agent is thinking
-- **handoffs/** - Communication between agents
+- [DORA State of DevOps Report](https://dora.dev/research/) - 10 years, 32,000+ professionals
+- [Spotify Squad Model](https://engineering.atspotify.com/) - Cross-functional autonomous teams
+- [Amazon Two-Pizza Teams](https://www.thesandreckoner.co.uk/how-google-amazon-and-spotify-set-up-their-teams-for-success/) - Max 7 people with end-to-end ownership
+- [Handoffs Research](https://www.scrum.org/resources/blog/why-handoffs-are-killing-your-agility) - Each handoff is a failure point
+- [Developer:QA Ratio Studies](https://www.prolifics-testing.com/news/optimal-tester-to-developer-ratios) - 5-6 devs per 1-2 testers
+- [Async Standup Research](https://www.parabol.co/blog/virtual-standups-vs-async-standups/) - 23 min focus recovery per interrupt
 
-## Known Limitations
+### DORA Metrics
 
-- **Token usage is high** - Multiple agents means multiple sessions means lots of tokens
-- **Latency** - File-based communication isn't instant
-- **No parallelism** - Each agent runs one task at a time
-- **Requires babysitting** - Agents can get stuck, loop, or misunderstand
-- **Experimental** - This is a proof of concept, not a polished tool
+The Agency tracks the four key metrics that correlate with high-performing teams:
 
-## Tips
+| Metric | Target | Description |
+|--------|--------|-------------|
+| Deployment Frequency | Daily | How often code ships to production |
+| Lead Time | < 1 day | Time from commit to production |
+| Change Failure Rate | < 15% | % of deployments causing issues |
+| MTTR | < 1 hour | Time to recover from incidents |
 
-1. **Be specific** - Vague requests lead to vague results
-2. **Start small** - Test with simple tasks first
-3. **Intervene** - Edit any file to redirect work
-4. **Monitor costs** - Check your Claude usage dashboard
+## Advanced Usage
 
-## Why File-Based?
+### Adding Custom Agents
 
-Everything is readable markdown. You can:
-- Open in Obsidian or any editor
-- Track changes with git
-- Edit files to intervene
-- Read agent thinking as it happens
-- Keep a record of what was built and why
+1. Create a directory under `agents/`:
+   ```bash
+   mkdir -p agents/my-agent
+   ```
+
+2. Create `AGENT.md` with the agent's prompt:
+   ```markdown
+   # My Agent
+
+   You are a specialized agent that...
+
+   ## Responsibilities
+   - Task 1
+   - Task 2
+
+   ## Workflow
+   1. Check for work in...
+   2. Process and update...
+   ```
+
+3. Add to `AGENTS` array in `agency.sh`:
+   ```bash
+   AGENTS=("product-owner" "tech-lead" ... "my-agent")
+   ```
+
+### Token Efficiency
+
+Agents are designed to be stateless and token-efficient:
+
+- **One task, one session** - Agents spawn fresh for each task
+- **Minimal context** - Only relevant files are read
+- **Exit when done** - No idle polling inside Claude sessions
+- **Watch mode** - Monitor activity without using tokens
+
+### Debugging
+
+Run a single agent in foreground to see its output:
+
+```bash
+./agency.sh dev-alpha
+```
+
+Check agent logs:
+```bash
+# Agents run via nohup, check standup.md for status
+cat .agency/data/standup.md
+```
+
+## Philosophy
+
+> "Speed and stability are not tradeoffs. Elite teams excel at both." — DORA Research
+
+> "Handoffs are a silent killer in software development." — Scrum.org
+
+> "No team should be set up that cannot be fed by two pizzas." — Jeff Bezos
+
+The Agency is an experiment in applying organizational research to AI agents. The goal is not just to build software, but to observe how different team structures affect autonomous agent performance.
+
+## Contributing
+
+Contributions welcome! Areas of interest:
+- New agent roles
+- Alternative team structures
+- Metrics and observability
+- Integration with other AI tools
 
 ## License
 
@@ -171,4 +316,5 @@ MIT - do whatever you want with this.
 
 ## Credits
 
-Inspired by the experiments of [Denislav Gavrilov](https://x.com/kuberdenis) and many others exploring autonomous AI systems.
+- Research: DORA, Spotify Engineering, Amazon/Google team structure studies
+- Original concept: [Denislav Gavrilov](https://x.com/kuberdenis)
