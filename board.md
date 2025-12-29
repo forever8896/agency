@@ -1,23 +1,32 @@
 # Board
 
-Kanban view of all work in progress.
+Squad Kanban - see `backlog.md` for details, `standup.md` for who's doing what.
 
 ---
 
 ## Inbox
-<!-- New requests waiting for triage -->
+<!-- New requests from inbox.md waiting for PO triage -->
 
-## Design
-<!-- With Architect -->
+## Ready
+<!-- Triaged, waiting for dev to claim -->
 
-## Development
-<!-- With Developer -->
-
-## QA
-<!-- With QA -->
-
-## Review
-<!-- With Reviewer -->
+## In Progress
+<!-- Actively being worked on -->
 
 ## Done
-<!-- Completed work -->
+<!-- Completed, waiting for DevOps deploy -->
+
+## Shipped
+<!-- Live in production -->
+
+---
+
+## DORA Metrics (This Week)
+| Metric | Value | Target |
+|--------|-------|--------|
+| Deployment Frequency | -- | Daily |
+| Lead Time | -- | < 1 day |
+| Change Failure Rate | -- | < 15% |
+| MTTR | -- | < 1 hour |
+
+*Updated by DevOps*

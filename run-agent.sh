@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# The Agency - Individual Agent Runner
+# The Agency v2 - Individual Agent Runner
 # Usage: ./run-agent.sh <agent-name>
 #
 
@@ -20,24 +20,28 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 declare -A AGENT_COLORS=(
-    ["dispatcher"]="$MAGENTA"
-    ["architect"]="$BLUE"
-    ["developer"]="$GREEN"
+    ["product-owner"]="$MAGENTA"
+    ["tech-lead"]="$BLUE"
+    ["dev-alpha"]="$GREEN"
+    ["dev-beta"]="$GREEN"
+    ["dev-gamma"]="$GREEN"
     ["qa"]="$YELLOW"
-    ["reviewer"]="$CYAN"
+    ["devops"]="$CYAN"
 )
 
 usage() {
-    echo -e "${CYAN}The Agency - Agent Runner${NC}"
+    echo -e "${CYAN}The Agency v2 - Squad Model${NC}"
     echo ""
     echo "Usage: $0 <agent-name>"
     echo ""
     echo "Available agents:"
-    echo "  dispatcher  - Triages requests, assigns work"
-    echo "  architect   - Designs systems, creates specs"
-    echo "  developer   - Implements features, writes code"
-    echo "  qa          - Tests and verifies work"
-    echo "  reviewer    - Final quality gate"
+    echo "  product-owner - Triages requests, defines acceptance criteria"
+    echo "  tech-lead     - Technical decisions, unblocks devs, can code"
+    echo "  dev-alpha     - Builder (general)"
+    echo "  dev-beta      - Builder (backend/optimization focus)"
+    echo "  dev-gamma     - Builder (frontend/UX focus)"
+    echo "  qa            - Selective testing for critical paths"
+    echo "  devops        - Deployment, monitoring, DORA metrics"
     exit 1
 }
 
@@ -53,7 +57,6 @@ if [[ ! -d "$AGENT_DIR" ]]; then
 fi
 
 AGENT_PROMPT="$AGENT_DIR/AGENT.md"
-AGENT_GOALS="$AGENT_DIR/goals.md"
 AGENT_STATUS="$AGENT_DIR/status.md"
 COLOR="${AGENT_COLORS[$AGENT_NAME]:-$NC}"
 
@@ -63,11 +66,29 @@ log() {
 
 has_work() {
     case "$AGENT_NAME" in
-        dispatcher)
+        product-owner)
+            # PO checks inbox for new requests
             grep -q "## NEW:" "$AGENCY_DIR/inbox.md" 2>/dev/null
             ;;
+        tech-lead)
+            # TL checks standup for blockers or backlog for complex items
+            grep -q "BLOCKED:" "$AGENCY_DIR/standup.md" 2>/dev/null || \
+            grep -q "## READY:" "$AGENCY_DIR/backlog.md" 2>/dev/null
+            ;;
+        dev-alpha|dev-beta|dev-gamma)
+            # Devs check backlog for ready items not claimed
+            grep -q "## READY:" "$AGENCY_DIR/backlog.md" 2>/dev/null
+            ;;
+        qa)
+            # QA checks handoffs for qa-required items
+            ls "$AGENCY_DIR/handoffs/"dev-to-qa-*.md 2>/dev/null | head -1 | grep -q . 2>/dev/null
+            ;;
+        devops)
+            # DevOps checks for completed items to deploy
+            grep -q "## DONE:" "$AGENCY_DIR/backlog.md" 2>/dev/null
+            ;;
         *)
-            grep -q "## PENDING:" "$AGENT_GOALS" 2>/dev/null
+            return 1
             ;;
     esac
 }
@@ -78,26 +99,46 @@ build_prompt() {
 
     prompt="$prompt
 
-## Agency Structure
+## Squad Structure
 
 - Inbox: $AGENCY_DIR/inbox.md
+- Backlog: $AGENCY_DIR/backlog.md
 - Board: $AGENCY_DIR/board.md
+- Standup: $AGENCY_DIR/standup.md
 - Handoffs: $AGENCY_DIR/handoffs/
 - Projects: $AGENCY_DIR/projects/
 - Knowledge: $AGENCY_DIR/knowledge/
-- Your Goals: $AGENCY_DIR/agents/$AGENT_NAME/goals.md
+- Metrics: $AGENCY_DIR/metrics.md
 - Your Status: $AGENCY_DIR/agents/$AGENT_NAME/status.md
 
 ## Current Time
 $(date '+%Y-%m-%d %H:%M:%S')
+
+## Key Files Quick Reference
+
+### backlog.md states:
+- READY: - Available for devs to claim
+- IN_PROGRESS: @dev-name - Being worked on
+- DONE: - Completed, waiting for deploy
+- SHIPPED: - Live in production
+
+### standup.md
+Update your section when starting/finishing work. Tech Lead monitors BLOCKED: items.
+
+### Workflow
+1. PO triages inbox → adds to backlog as READY
+2. Devs claim READY items → mark IN_PROGRESS
+3. Devs complete → mark DONE (create handoff to QA only if flagged)
+4. DevOps deploys DONE items → mark SHIPPED
 "
     echo "$prompt"
 }
 
 main() {
-    log "${CYAN}Agent $AGENT_NAME coming online...${NC}"
-    log "Goals: $AGENT_GOALS"
+    log "${CYAN}Agent $AGENT_NAME coming online (v2 Squad Model)...${NC}"
     log "Status: $AGENT_STATUS"
+    log "Backlog: $AGENCY_DIR/backlog.md"
+    log "Standup: $AGENCY_DIR/standup.md"
     log "Press Ctrl+C to stop"
     echo ""
 

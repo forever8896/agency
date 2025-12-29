@@ -1,1 +1,38 @@
+# Runtime state - ignore generated content
 .pids/
+
+# Agent runtime state (keep AGENT.md templates, ignore session state)
+agents/*/status.md
+agents/*/goals.md
+
+# Session-specific content
+handoffs/*.md
+!handoffs/.gitkeep
+
+projects/*.md
+!projects/.gitkeep
+
+knowledge/*.md
+!knowledge/.gitkeep
+
+# Runtime board/standup state (template versions exist as examples)
+# Uncomment these if you want to ignore runtime state:
+# board.md
+# standup.md
+# backlog.md
+# inbox.md
+# metrics.md
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Claude session files
+.claude/

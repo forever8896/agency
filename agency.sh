@@ -1,13 +1,20 @@
 #!/bin/bash
 #
-# The Agency - Multi-Agent Orchestrator
+# The Agency v2 - Squad Model Orchestrator
+#
+# Based on data-driven research:
+# - DORA metrics for measuring performance
+# - Spotify squad model for team structure
+# - Amazon two-pizza teams for sizing
+# - Async standups to reduce interrupt cost
+# - Reduced handoffs for faster cycle time
 #
 # Usage:
 #   ./agency.sh              - Start all agents
 #   ./agency.sh start        - Start all agents
 #   ./agency.sh stop         - Stop all agents
 #   ./agency.sh status       - Show agent status
-#   ./agency.sh <agent>      - Run single agent (dispatcher, architect, developer, qa, reviewer)
+#   ./agency.sh <agent>      - Run single agent (product-owner, tech-lead, dev-*, qa, devops)
 #
 
 set -e
@@ -15,7 +22,11 @@ set -e
 # Auto-detect installation path (override with AGENCY_DIR env var if needed)
 AGENCY_DIR="${AGENCY_DIR:-$(dirname "$(realpath "$0")")}"
 PID_DIR="$AGENCY_DIR/.pids"
-AGENTS=("dispatcher" "architect" "developer" "qa" "reviewer")
+
+# Squad composition based on research:
+# - 5-6 devs per 1-2 QA (we have 3 devs + tech-lead who can code = ~4 builders)
+# - Cross-functional team with end-to-end ownership
+AGENTS=("product-owner" "tech-lead" "dev-alpha" "dev-beta" "dev-gamma" "qa" "devops")
 
 # Colors
 RED='\033[0;31m'
@@ -31,16 +42,23 @@ mkdir -p "$PID_DIR"
 
 banner() {
     echo -e "${BOLD}${CYAN}"
-    echo "╔════════════════════════════════════════════════════════════╗"
-    echo "║                                                            ║"
-    echo "║                      THE AGENCY                            ║"
-    echo "║                                                            ║"
-    echo "║          Autonomous Multi-Agent Development Team           ║"
-    echo "║                                                            ║"
-    echo "╠════════════════════════════════════════════════════════════╣"
-    echo "║  Dispatcher  │  Architect  │  Developer  │  QA  │ Reviewer ║"
-    echo "╚════════════════════════════════════════════════════════════╝"
+    echo "╔════════════════════════════════════════════════════════════════════╗"
+    echo "║                                                                    ║"
+    echo "║                      THE AGENCY v2                                 ║"
+    echo "║                                                                    ║"
+    echo "║               Squad Model - Data-Driven Design                     ║"
+    echo "║                                                                    ║"
+    echo "╠════════════════════════════════════════════════════════════════════╣"
+    echo "║  PO │ Tech Lead │ Dev α │ Dev β │ Dev γ │ QA │ DevOps             ║"
+    echo "╚════════════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
+    echo -e "${YELLOW}Research-backed improvements:${NC}"
+    echo "  • 3 developers (vs 1) - optimal dev:QA ratio"
+    echo "  • Async standups - saves ~4 hrs/week interrupt cost"
+    echo "  • Selective QA - not every change needs full testing"
+    echo "  • Direct claiming - reduced handoff bottlenecks"
+    echo "  • DORA metrics - tracking what matters"
+    echo ""
 }
 
 start_agent() {
@@ -81,16 +99,14 @@ stop_agent() {
 status_agent() {
     local agent=$1
     local pid_file="$PID_DIR/${agent}.pid"
-    local status_file="$AGENCY_DIR/agents/$agent/status.md"
 
     if [[ -f "$pid_file" ]] && kill -0 "$(cat "$pid_file")" 2>/dev/null; then
         local pid=$(cat "$pid_file")
         echo -e "${GREEN}●${NC} $agent (PID: $pid)"
-        if [[ -f "$status_file" ]]; then
-            local current=$(grep "^\*\*Current:\*\*" "$status_file" 2>/dev/null | head -1 | sed 's/\*\*Current:\*\* //')
-            if [[ -n "$current" ]]; then
-                echo -e "  └─ $current"
-            fi
+        # Try to get status from standup
+        local standup_status=$(grep -A 5 "## $agent" "$AGENCY_DIR/standup.md" 2>/dev/null | grep "Working on:" | head -1 | sed 's/\*\*Working on:\*\* //')
+        if [[ -n "$standup_status" && "$standup_status" != "--" ]]; then
+            echo -e "  └─ $standup_status"
         fi
     else
         echo -e "${RED}○${NC} $agent (stopped)"
@@ -99,37 +115,47 @@ status_agent() {
 
 start_all() {
     banner
-    echo -e "${BOLD}Starting all agents...${NC}"
+    echo -e "${BOLD}Starting squad...${NC}"
     echo ""
     for agent in "${AGENTS[@]}"; do
         start_agent "$agent"
     done
     echo ""
-    echo -e "${GREEN}Agency is now operational.${NC}"
-    echo -e "Add requests to: ${CYAN}$AGENCY_DIR/inbox.md${NC}"
-    echo -e "Watch progress on: ${CYAN}$AGENCY_DIR/board.md${NC}"
+    echo -e "${GREEN}Squad is now operational.${NC}"
+    echo ""
+    echo -e "Add requests to:    ${CYAN}$AGENCY_DIR/inbox.md${NC}"
+    echo -e "Watch backlog:      ${CYAN}$AGENCY_DIR/backlog.md${NC}"
+    echo -e "See standup:        ${CYAN}$AGENCY_DIR/standup.md${NC}"
+    echo -e "Track DORA metrics: ${CYAN}$AGENCY_DIR/metrics.md${NC}"
     echo ""
     echo -e "Stop all: $0 stop"
 }
 
 stop_all() {
-    echo -e "${BOLD}Stopping all agents...${NC}"
+    echo -e "${BOLD}Stopping squad...${NC}"
     echo ""
     for agent in "${AGENTS[@]}"; do
         stop_agent "$agent"
     done
     echo ""
-    echo -e "${RED}Agency is now offline.${NC}"
+    echo -e "${RED}Squad is now offline.${NC}"
 }
 
 show_status() {
     banner
-    echo -e "${BOLD}Agent Status:${NC}"
+    echo -e "${BOLD}Squad Status:${NC}"
     echo ""
     for agent in "${AGENTS[@]}"; do
         status_agent "$agent"
     done
     echo ""
+
+    # Show DORA metrics summary if available
+    if [[ -f "$AGENCY_DIR/metrics.md" ]]; then
+        echo -e "${BOLD}DORA Metrics:${NC}"
+        grep -A 4 "## Current Period" "$AGENCY_DIR/metrics.md" 2>/dev/null | tail -4 || true
+        echo ""
+    fi
 }
 
 run_single() {
@@ -152,7 +178,7 @@ usage() {
     echo "Commands:"
     echo "  start           Start all agents in background"
     echo "  stop            Stop all agents"
-    echo "  status          Show agent status"
+    echo "  status          Show agent status and DORA metrics"
     echo "  <agent-name>    Run single agent in foreground"
     echo ""
     echo "Agents: ${AGENTS[*]}"
@@ -160,7 +186,7 @@ usage() {
     echo "Quick start:"
     echo "  1. Add a request to: $AGENCY_DIR/inbox.md"
     echo "  2. Run: $0 start"
-    echo "  3. Watch: $AGENCY_DIR/board.md"
+    echo "  3. Watch: $AGENCY_DIR/backlog.md and $AGENCY_DIR/standup.md"
     echo ""
 }
 
@@ -177,7 +203,7 @@ case "${1:-start}" in
     help|--help|-h)
         usage
         ;;
-    dispatcher|architect|developer|qa|reviewer)
+    product-owner|tech-lead|dev-alpha|dev-beta|dev-gamma|qa|devops)
         run_single "$1"
         ;;
     *)
