@@ -8,19 +8,43 @@
 # - Amazon two-pizza teams for sizing
 # - Async standups to reduce interrupt cost
 # - Reduced handoffs for faster cycle time
+# - Token-efficient stateless agents
 #
 # Usage:
 #   ./agency.sh              - Start all agents
 #   ./agency.sh start        - Start all agents
 #   ./agency.sh stop         - Stop all agents
 #   ./agency.sh status       - Show agent status
-#   ./agency.sh <agent>      - Run single agent (product-owner, tech-lead, dev-*, qa, devops)
+#   ./agency.sh <agent>      - Run single agent
+#
+# Configuration (environment variables):
+#   AGENCY_DIR    - Agency files (default: script dir, can be Obsidian vault)
+#   PROJECTS_DIR  - Code projects location (default: ~/projects)
+#   POLL_INTERVAL - Seconds between work checks (default: 30)
+#
+# Examples:
+#   AGENCY_DIR=~/obsidian/Agency ./agency.sh start
+#   PROJECTS_DIR=~/code AGENCY_DIR=~/obsidian/Agency ./agency.sh start
 #
 
 set -e
 
-# Auto-detect installation path (override with AGENCY_DIR env var if needed)
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
+
+# Agency files location (can point to your Obsidian vault)
 AGENCY_DIR="${AGENCY_DIR:-$(dirname "$(realpath "$0")")}"
+
+# Where agents create actual code projects (not specs)
+PROJECTS_DIR="${PROJECTS_DIR:-$HOME/projects}"
+
+# How often agents check for work (seconds)
+POLL_INTERVAL="${POLL_INTERVAL:-30}"
+
+# Export for child processes (run-agent.sh)
+export AGENCY_DIR PROJECTS_DIR POLL_INTERVAL
+
 PID_DIR="$AGENCY_DIR/.pids"
 
 # Squad composition based on research:
@@ -58,6 +82,12 @@ banner() {
     echo "  • Selective QA - not every change needs full testing"
     echo "  • Direct claiming - reduced handoff bottlenecks"
     echo "  • DORA metrics - tracking what matters"
+    echo "  • Stateless agents - spawn fresh, exit when done (token efficient)"
+    echo ""
+    echo -e "${BLUE}Configuration:${NC}"
+    echo "  AGENCY_DIR=$AGENCY_DIR"
+    echo "  PROJECTS_DIR=$PROJECTS_DIR"
+    echo "  POLL_INTERVAL=${POLL_INTERVAL}s"
     echo ""
 }
 
@@ -127,6 +157,7 @@ start_all() {
     echo -e "Watch backlog:      ${CYAN}$AGENCY_DIR/backlog.md${NC}"
     echo -e "See standup:        ${CYAN}$AGENCY_DIR/standup.md${NC}"
     echo -e "Track DORA metrics: ${CYAN}$AGENCY_DIR/metrics.md${NC}"
+    echo -e "Code projects in:   ${CYAN}$PROJECTS_DIR${NC}"
     echo ""
     echo -e "Stop all: $0 stop"
 }

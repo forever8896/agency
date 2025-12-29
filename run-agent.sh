@@ -1,13 +1,32 @@
 #!/bin/bash
 #
 # The Agency v2 - Individual Agent Runner
+#
+# Token-efficient design:
+# - Agents spawn fresh for EACH task (no accumulated context)
+# - Minimal prompt - just what's needed for current work
+# - Exit after completing ONE task
+#
 # Usage: ./run-agent.sh <agent-name>
 #
 
 set -e
 
-# Auto-detect installation path (override with AGENCY_DIR env var if needed)
+# ============================================================================
+# CONFIGURATION - Override these with environment variables
+# ============================================================================
+
+# Agency files location (can be your Obsidian vault)
 AGENCY_DIR="${AGENCY_DIR:-$(dirname "$(realpath "$0")")}"
+
+# Where to create actual code projects (not specs, real code)
+PROJECTS_DIR="${PROJECTS_DIR:-$HOME/projects}"
+
+# How long to wait between checking for work (seconds)
+POLL_INTERVAL="${POLL_INTERVAL:-30}"
+
+# ============================================================================
+
 AGENT_NAME="${1:-}"
 
 # Colors
@@ -34,6 +53,15 @@ usage() {
     echo ""
     echo "Usage: $0 <agent-name>"
     echo ""
+    echo "Configuration (via environment):"
+    echo "  AGENCY_DIR    - Agency files location (default: script directory)"
+    echo "  PROJECTS_DIR  - Where to create code projects (default: ~/projects)"
+    echo "  POLL_INTERVAL - Seconds between work checks (default: 30)"
+    echo ""
+    echo "Examples:"
+    echo "  AGENCY_DIR=~/obsidian/Agency ./run-agent.sh dev-alpha"
+    echo "  PROJECTS_DIR=~/code ./run-agent.sh tech-lead"
+    echo ""
     echo "Available agents:"
     echo "  product-owner - Triages requests, defines acceptance criteria"
     echo "  tech-lead     - Technical decisions, unblocks devs, can code"
@@ -57,34 +85,30 @@ if [[ ! -d "$AGENT_DIR" ]]; then
 fi
 
 AGENT_PROMPT="$AGENT_DIR/AGENT.md"
-AGENT_STATUS="$AGENT_DIR/status.md"
 COLOR="${AGENT_COLORS[$AGENT_NAME]:-$NC}"
 
 log() {
-    echo -e "${COLOR}[$(date '+%Y-%m-%d %H:%M:%S')] [$AGENT_NAME]${NC} $1"
+    echo -e "${COLOR}[$(date '+%H:%M:%S')] [$AGENT_NAME]${NC} $1"
 }
 
+# Check if there's work for this agent type
+# Returns 0 (true) if work exists, 1 (false) otherwise
 has_work() {
     case "$AGENT_NAME" in
         product-owner)
-            # PO checks inbox for new requests
             grep -q "## NEW:" "$AGENCY_DIR/inbox.md" 2>/dev/null
             ;;
         tech-lead)
-            # TL checks standup for blockers or backlog for complex items
             grep -q "BLOCKED:" "$AGENCY_DIR/standup.md" 2>/dev/null || \
             grep -q "## READY:" "$AGENCY_DIR/backlog.md" 2>/dev/null
             ;;
         dev-alpha|dev-beta|dev-gamma)
-            # Devs check backlog for ready items not claimed
             grep -q "## READY:" "$AGENCY_DIR/backlog.md" 2>/dev/null
             ;;
         qa)
-            # QA checks handoffs for qa-required items
             ls "$AGENCY_DIR/handoffs/"dev-to-qa-*.md 2>/dev/null | head -1 | grep -q . 2>/dev/null
             ;;
         devops)
-            # DevOps checks for completed items to deploy
             grep -q "## DONE:" "$AGENCY_DIR/backlog.md" 2>/dev/null
             ;;
         *)
@@ -93,73 +117,68 @@ has_work() {
     esac
 }
 
+# Build minimal prompt - just what the agent needs for THIS task
+# Key insight: Don't load everything, just the relevant context
 build_prompt() {
     local prompt
     prompt=$(cat "$AGENT_PROMPT")
 
+    # Add paths and minimal context
     prompt="$prompt
 
-## Squad Structure
+## Paths
 
+- **Agency files:** $AGENCY_DIR
+- **Code projects:** $PROJECTS_DIR (create new projects here, not in agency folder)
 - Inbox: $AGENCY_DIR/inbox.md
 - Backlog: $AGENCY_DIR/backlog.md
-- Board: $AGENCY_DIR/board.md
 - Standup: $AGENCY_DIR/standup.md
 - Handoffs: $AGENCY_DIR/handoffs/
-- Projects: $AGENCY_DIR/projects/
-- Knowledge: $AGENCY_DIR/knowledge/
-- Metrics: $AGENCY_DIR/metrics.md
-- Your Status: $AGENCY_DIR/agents/$AGENT_NAME/status.md
 
 ## Current Time
 $(date '+%Y-%m-%d %H:%M:%S')
 
-## Key Files Quick Reference
+## CRITICAL: Token Efficiency
 
-### backlog.md states:
-- READY: - Available for devs to claim
-- IN_PROGRESS: @dev-name - Being worked on
-- DONE: - Completed, waiting for deploy
-- SHIPPED: - Live in production
+You are a STATELESS agent. To minimize token usage:
 
-### standup.md
-Update your section when starting/finishing work. Tech Lead monitors BLOCKED: items.
+1. **DO ONE TASK, THEN EXIT** - Don't loop or check for more work
+2. **Read only what you need** - Don't read files 'just to check'
+3. **Write concise updates** - Short standup entries, minimal handoffs
+4. **Exit when done** - After completing your task, simply stop
 
-### Workflow
-1. PO triages inbox → adds to backlog as READY
-2. Devs claim READY items → mark IN_PROGRESS
-3. Devs complete → mark DONE (create handoff to QA only if flagged)
-4. DevOps deploys DONE items → mark SHIPPED
+When you finish your task (or find no actionable work), just stop responding.
+The orchestrator will spawn a fresh instance when new work arrives.
 "
     echo "$prompt"
 }
 
 main() {
-    log "${CYAN}Agent $AGENT_NAME coming online (v2 Squad Model)...${NC}"
-    log "Status: $AGENT_STATUS"
-    log "Backlog: $AGENCY_DIR/backlog.md"
-    log "Standup: $AGENCY_DIR/standup.md"
-    log "Press Ctrl+C to stop"
-    echo ""
+    log "Starting (AGENCY_DIR=$AGENCY_DIR, PROJECTS_DIR=$PROJECTS_DIR)"
 
     while true; do
         if has_work; then
-            log "${GREEN}Work detected, $AGENT_NAME engaging...${NC}"
+            log "${GREEN}Work found - spawning fresh Claude session...${NC}"
 
             PROMPT=$(build_prompt)
 
+            # Spawn fresh Claude session for this ONE task
+            # Using --dangerously-skip-permissions for autonomous operation
+            # Session ends when agent completes task and stops responding
             claude -p "$PROMPT" --dangerously-skip-permissions
 
             EXIT_CODE=$?
-            log "Session ended (exit: $EXIT_CODE). Checking for more work in 10s..."
-            sleep 10
+            log "Session ended (exit: $EXIT_CODE)"
+
+            # Brief pause before checking for more work
+            sleep 5
         else
-            log "No pending work. Waiting..."
-            sleep 30
+            log "No work. Sleeping ${POLL_INTERVAL}s..."
+            sleep "$POLL_INTERVAL"
         fi
     done
 }
 
-trap 'echo ""; log "Agent $AGENT_NAME signing off..."; exit 0' INT
+trap 'echo ""; log "Shutting down..."; exit 0' INT TERM
 
 main
