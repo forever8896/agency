@@ -1,5 +1,6 @@
 # Runtime state - ignore generated content
 .pids/
+.agency/data/
 
 # Agent runtime state (keep AGENT.md templates, ignore session state)
 agents/*/status.md
@@ -36,3 +37,6 @@ Thumbs.db
 
 # Claude session files
 .claude/
+
+# Obsidian session files
+.obsidian/

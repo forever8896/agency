@@ -19,6 +19,9 @@ set -e
 # Agency files location (can be your Obsidian vault)
 AGENCY_DIR="${AGENCY_DIR:-$(dirname "$(realpath "$0")")}"
 
+# Runtime data directory (gitignored, contains actual work state)
+DATA_DIR="${DATA_DIR:-$AGENCY_DIR/.agency/data}"
+
 # Where to create actual code projects (not specs, real code)
 PROJECTS_DIR="${PROJECTS_DIR:-$HOME/projects}"
 
@@ -96,20 +99,20 @@ log() {
 has_work() {
     case "$AGENT_NAME" in
         product-owner)
-            grep -q "## NEW:" "$AGENCY_DIR/inbox.md" 2>/dev/null
+            grep -q "## NEW:" "$DATA_DIR/inbox.md" 2>/dev/null
             ;;
         tech-lead)
-            grep -q "BLOCKED:" "$AGENCY_DIR/standup.md" 2>/dev/null || \
-            grep -q "## READY:" "$AGENCY_DIR/backlog.md" 2>/dev/null
+            grep -q "BLOCKED:" "$DATA_DIR/standup.md" 2>/dev/null || \
+            grep -q "## READY:" "$DATA_DIR/backlog.md" 2>/dev/null
             ;;
         dev-alpha|dev-beta|dev-gamma)
-            grep -q "## READY:" "$AGENCY_DIR/backlog.md" 2>/dev/null
+            grep -q "## READY:" "$DATA_DIR/backlog.md" 2>/dev/null
             ;;
         qa)
             ls "$AGENCY_DIR/handoffs/"dev-to-qa-*.md 2>/dev/null | head -1 | grep -q . 2>/dev/null
             ;;
         devops)
-            grep -q "## DONE:" "$AGENCY_DIR/backlog.md" 2>/dev/null
+            grep -q "## DONE:" "$DATA_DIR/backlog.md" 2>/dev/null
             ;;
         *)
             return 1
@@ -129,10 +132,13 @@ build_prompt() {
 ## Paths
 
 - **Agency files:** $AGENCY_DIR
+- **Runtime data:** $DATA_DIR
 - **Code projects:** $PROJECTS_DIR (create new projects here, not in agency folder)
-- Inbox: $AGENCY_DIR/inbox.md
-- Backlog: $AGENCY_DIR/backlog.md
-- Standup: $AGENCY_DIR/standup.md
+- Inbox: $DATA_DIR/inbox.md
+- Backlog: $DATA_DIR/backlog.md
+- Standup: $DATA_DIR/standup.md
+- Board: $DATA_DIR/board.md
+- Metrics: $DATA_DIR/metrics.md
 - Handoffs: $AGENCY_DIR/handoffs/
 
 ## Current Time
@@ -154,7 +160,7 @@ The orchestrator will spawn a fresh instance when new work arrives.
 }
 
 main() {
-    log "Starting (AGENCY_DIR=$AGENCY_DIR, PROJECTS_DIR=$PROJECTS_DIR)"
+    log "Starting (DATA_DIR=$DATA_DIR, PROJECTS_DIR=$PROJECTS_DIR)"
 
     while true; do
         if has_work; then

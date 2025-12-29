@@ -27,13 +27,6 @@ No handoff chain. No waiting. Claim it, build it, ship it.
 ## Ready for Work
 <!-- Devs: claim these by adding @your-name and changing to IN_PROGRESS -->
 
-*No items ready - PO should triage inbox*
-
----
-
-## In Progress
-<!-- Currently being worked on -->
-
 ---
 
 ## Done
@@ -43,3 +36,4 @@ No handoff chain. No waiting. Claim it, build it, ship it.
 
 ## Shipped
 <!-- Deployed to production -->
+

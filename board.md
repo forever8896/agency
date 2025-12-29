@@ -29,4 +29,3 @@ Squad Kanban - see `backlog.md` for details, `standup.md` for who's doing what.
 | Change Failure Rate | -- | < 15% |
 | MTTR | -- | < 1 hour |
 
-*Updated by DevOps*

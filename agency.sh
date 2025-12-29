@@ -36,6 +36,9 @@ set -e
 # Agency files location (can point to your Obsidian vault)
 AGENCY_DIR="${AGENCY_DIR:-$(dirname "$(realpath "$0")")}"
 
+# Runtime data directory (gitignored, contains actual work state)
+DATA_DIR="${DATA_DIR:-$AGENCY_DIR/.agency/data}"
+
 # Where agents create actual code projects (not specs)
 PROJECTS_DIR="${PROJECTS_DIR:-$HOME/projects}"
 
@@ -43,7 +46,7 @@ PROJECTS_DIR="${PROJECTS_DIR:-$HOME/projects}"
 POLL_INTERVAL="${POLL_INTERVAL:-30}"
 
 # Export for child processes (run-agent.sh)
-export AGENCY_DIR PROJECTS_DIR POLL_INTERVAL
+export AGENCY_DIR DATA_DIR PROJECTS_DIR POLL_INTERVAL
 
 PID_DIR="$AGENCY_DIR/.pids"
 
@@ -74,6 +77,21 @@ declare -A AGENT_COLORS=(
 )
 
 mkdir -p "$PID_DIR"
+mkdir -p "$DATA_DIR"
+
+# Initialize data files from templates if they don't exist
+init_data() {
+    local files=("inbox.md" "backlog.md" "board.md" "standup.md" "metrics.md")
+    for file in "${files[@]}"; do
+        if [[ ! -f "$DATA_DIR/$file" && -f "$AGENCY_DIR/$file" ]]; then
+            cp "$AGENCY_DIR/$file" "$DATA_DIR/$file"
+            echo -e "${GREEN}Initialized $file from template${NC}"
+        fi
+    done
+}
+
+# Ensure data is initialized
+init_data
 
 banner() {
     echo -e "${BOLD}${CYAN}"
@@ -97,6 +115,7 @@ banner() {
     echo ""
     echo -e "${BLUE}Configuration:${NC}"
     echo "  AGENCY_DIR=$AGENCY_DIR"
+    echo "  DATA_DIR=$DATA_DIR"
     echo "  PROJECTS_DIR=$PROJECTS_DIR"
     echo "  POLL_INTERVAL=${POLL_INTERVAL}s"
     echo ""
@@ -145,7 +164,7 @@ status_agent() {
         local pid=$(cat "$pid_file")
         echo -e "${GREEN}●${NC} $agent (PID: $pid)"
         # Try to get status from standup
-        local standup_status=$(grep -A 5 "## $agent" "$AGENCY_DIR/standup.md" 2>/dev/null | grep "Working on:" | head -1 | sed 's/\*\*Working on:\*\* //')
+        local standup_status=$(grep -A 5 "## $agent" "$DATA_DIR/standup.md" 2>/dev/null | grep "Working on:" | head -1 | sed 's/\*\*Working on:\*\* //')
         if [[ -n "$standup_status" && "$standup_status" != "--" ]]; then
             echo -e "  └─ $standup_status"
         fi
@@ -164,10 +183,10 @@ start_all() {
     echo ""
     echo -e "${GREEN}Squad is now operational.${NC}"
     echo ""
-    echo -e "Add requests to:    ${CYAN}$AGENCY_DIR/inbox.md${NC}"
-    echo -e "Watch backlog:      ${CYAN}$AGENCY_DIR/backlog.md${NC}"
-    echo -e "See standup:        ${CYAN}$AGENCY_DIR/standup.md${NC}"
-    echo -e "Track DORA metrics: ${CYAN}$AGENCY_DIR/metrics.md${NC}"
+    echo -e "Add requests to:    ${CYAN}$DATA_DIR/inbox.md${NC}"
+    echo -e "Watch backlog:      ${CYAN}$DATA_DIR/backlog.md${NC}"
+    echo -e "See standup:        ${CYAN}$DATA_DIR/standup.md${NC}"
+    echo -e "Track DORA metrics: ${CYAN}$DATA_DIR/metrics.md${NC}"
     echo -e "Code projects in:   ${CYAN}$PROJECTS_DIR${NC}"
     echo ""
     echo -e "Stop all: $0 stop"
@@ -193,9 +212,9 @@ show_status() {
     echo ""
 
     # Show DORA metrics summary if available
-    if [[ -f "$AGENCY_DIR/metrics.md" ]]; then
+    if [[ -f "$DATA_DIR/metrics.md" ]]; then
         echo -e "${BOLD}DORA Metrics:${NC}"
-        grep -A 4 "## Current Period" "$AGENCY_DIR/metrics.md" 2>/dev/null | tail -4 || true
+        grep -A 4 "## Current Period" "$DATA_DIR/metrics.md" 2>/dev/null | tail -4 || true
         echo ""
     fi
 }
@@ -225,10 +244,10 @@ get_checksum() {
 }
 
 init_checksums() {
-    FILE_CHECKSUMS["inbox"]=$(get_checksum "$AGENCY_DIR/inbox.md")
-    FILE_CHECKSUMS["backlog"]=$(get_checksum "$AGENCY_DIR/backlog.md")
-    FILE_CHECKSUMS["standup"]=$(get_checksum "$AGENCY_DIR/standup.md")
-    FILE_CHECKSUMS["board"]=$(get_checksum "$AGENCY_DIR/board.md")
+    FILE_CHECKSUMS["inbox"]=$(get_checksum "$DATA_DIR/inbox.md")
+    FILE_CHECKSUMS["backlog"]=$(get_checksum "$DATA_DIR/backlog.md")
+    FILE_CHECKSUMS["standup"]=$(get_checksum "$DATA_DIR/standup.md")
+    FILE_CHECKSUMS["board"]=$(get_checksum "$DATA_DIR/board.md")
 }
 
 log_event() {
@@ -239,15 +258,15 @@ log_event() {
 }
 
 check_inbox_changes() {
-    local new_checksum=$(get_checksum "$AGENCY_DIR/inbox.md")
+    local new_checksum=$(get_checksum "$DATA_DIR/inbox.md")
     if [[ "${FILE_CHECKSUMS["inbox"]}" != "$new_checksum" ]]; then
         FILE_CHECKSUMS["inbox"]="$new_checksum"
         # Check for new requests
-        local new_count=$(grep -c "## NEW:" "$AGENCY_DIR/inbox.md" 2>/dev/null || echo 0)
+        local new_count=$(grep -c "## NEW:" "$DATA_DIR/inbox.md" 2>/dev/null || echo 0)
         if [[ "$new_count" -gt 0 ]]; then
             log_event "📥" "$MAGENTA" "Inbox: $new_count new request(s) waiting"
         fi
-        local triaged=$(grep "## TRIAGED:" "$AGENCY_DIR/inbox.md" 2>/dev/null | tail -1 | sed 's/## TRIAGED: //')
+        local triaged=$(grep "## TRIAGED:" "$DATA_DIR/inbox.md" 2>/dev/null | tail -1 | sed 's/## TRIAGED: //')
         if [[ -n "$triaged" ]]; then
             log_event "✓ " "$GREEN" "PO triaged: $triaged"
         fi
@@ -255,15 +274,15 @@ check_inbox_changes() {
 }
 
 check_backlog_changes() {
-    local new_checksum=$(get_checksum "$AGENCY_DIR/backlog.md")
+    local new_checksum=$(get_checksum "$DATA_DIR/backlog.md")
     if [[ "${FILE_CHECKSUMS["backlog"]}" != "$new_checksum" ]]; then
         FILE_CHECKSUMS["backlog"]="$new_checksum"
 
         # Check for state changes
-        local ready=$(grep -c "## READY:" "$AGENCY_DIR/backlog.md" 2>/dev/null || echo 0)
-        local in_progress=$(grep "## IN_PROGRESS:" "$AGENCY_DIR/backlog.md" 2>/dev/null | tail -1)
-        local done=$(grep "## DONE:" "$AGENCY_DIR/backlog.md" 2>/dev/null | tail -1)
-        local shipped=$(grep "## SHIPPED:" "$AGENCY_DIR/backlog.md" 2>/dev/null | tail -1)
+        local ready=$(grep -c "## READY:" "$DATA_DIR/backlog.md" 2>/dev/null || echo 0)
+        local in_progress=$(grep "## IN_PROGRESS:" "$DATA_DIR/backlog.md" 2>/dev/null | tail -1)
+        local done=$(grep "## DONE:" "$DATA_DIR/backlog.md" 2>/dev/null | tail -1)
+        local shipped=$(grep "## SHIPPED:" "$DATA_DIR/backlog.md" 2>/dev/null | tail -1)
 
         if [[ -n "$in_progress" ]]; then
             local task=$(echo "$in_progress" | sed 's/## IN_PROGRESS: //')
@@ -284,21 +303,21 @@ check_backlog_changes() {
 }
 
 check_standup_changes() {
-    local new_checksum=$(get_checksum "$AGENCY_DIR/standup.md")
+    local new_checksum=$(get_checksum "$DATA_DIR/standup.md")
     if [[ "${FILE_CHECKSUMS["standup"]}" != "$new_checksum" ]]; then
         FILE_CHECKSUMS["standup"]="$new_checksum"
 
         # Check for blockers
-        if grep -q "BLOCKED:" "$AGENCY_DIR/standup.md" 2>/dev/null; then
-            local blocker=$(grep -A 1 "BLOCKED:" "$AGENCY_DIR/standup.md" | tail -1)
+        if grep -q "BLOCKED:" "$DATA_DIR/standup.md" 2>/dev/null; then
+            local blocker=$(grep -A 1 "BLOCKED:" "$DATA_DIR/standup.md" | tail -1)
             log_event "🚫" "$RED" "BLOCKED: $blocker"
         fi
 
         # Check who's working
         for agent in "${AGENTS[@]}"; do
-            local status=$(grep -A 2 "## $agent" "$AGENCY_DIR/standup.md" 2>/dev/null | grep "Status:" | sed 's/\*\*Status:\*\* //')
+            local status=$(grep -A 2 "## $agent" "$DATA_DIR/standup.md" 2>/dev/null | grep "Status:" | sed 's/\*\*Status:\*\* //')
             if [[ "$status" == "Building" ]]; then
-                local working=$(grep -A 3 "## $agent" "$AGENCY_DIR/standup.md" 2>/dev/null | grep "Working on:" | sed 's/\*\*Working on:\*\* //')
+                local working=$(grep -A 3 "## $agent" "$DATA_DIR/standup.md" 2>/dev/null | grep "Working on:" | sed 's/\*\*Working on:\*\* //')
                 if [[ -n "$working" && "$working" != "--" ]]; then
                     log_event "⚡" "${AGENT_COLORS[$agent]:-$NC}" "$agent: $working"
                 fi
@@ -357,7 +376,7 @@ usage() {
     echo "Agents: ${AGENTS[*]}"
     echo ""
     echo "Quick start:"
-    echo "  1. Add a request to: $AGENCY_DIR/inbox.md"
+    echo "  1. Add a request to: $DATA_DIR/inbox.md"
     echo "  2. Run: $0 start"
     echo "  3. Run: $0 watch   # See live activity"
     echo ""
