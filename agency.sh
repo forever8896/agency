@@ -62,6 +62,17 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m'
 
+# Agent colors for logging
+declare -A AGENT_COLORS=(
+    ["product-owner"]="$MAGENTA"
+    ["tech-lead"]="$BLUE"
+    ["dev-alpha"]="$GREEN"
+    ["dev-beta"]="$GREEN"
+    ["dev-gamma"]="$GREEN"
+    ["qa"]="$YELLOW"
+    ["devops"]="$CYAN"
+)
+
 mkdir -p "$PID_DIR"
 
 banner() {
@@ -202,6 +213,136 @@ run_single() {
     exec "$AGENCY_DIR/run-agent.sh" "$agent"
 }
 
+# ============================================================================
+# WATCH MODE - Live event logging without token usage
+# ============================================================================
+
+# Store file checksums for change detection
+declare -A FILE_CHECKSUMS
+
+get_checksum() {
+    md5sum "$1" 2>/dev/null | cut -d' ' -f1 || echo "none"
+}
+
+init_checksums() {
+    FILE_CHECKSUMS["inbox"]=$(get_checksum "$AGENCY_DIR/inbox.md")
+    FILE_CHECKSUMS["backlog"]=$(get_checksum "$AGENCY_DIR/backlog.md")
+    FILE_CHECKSUMS["standup"]=$(get_checksum "$AGENCY_DIR/standup.md")
+    FILE_CHECKSUMS["board"]=$(get_checksum "$AGENCY_DIR/board.md")
+}
+
+log_event() {
+    local icon="$1"
+    local color="$2"
+    local message="$3"
+    echo -e "${color}$icon ${NC}[$(date '+%H:%M:%S')] $message"
+}
+
+check_inbox_changes() {
+    local new_checksum=$(get_checksum "$AGENCY_DIR/inbox.md")
+    if [[ "${FILE_CHECKSUMS["inbox"]}" != "$new_checksum" ]]; then
+        FILE_CHECKSUMS["inbox"]="$new_checksum"
+        # Check for new requests
+        local new_count=$(grep -c "## NEW:" "$AGENCY_DIR/inbox.md" 2>/dev/null || echo 0)
+        if [[ "$new_count" -gt 0 ]]; then
+            log_event "📥" "$MAGENTA" "Inbox: $new_count new request(s) waiting"
+        fi
+        local triaged=$(grep "## TRIAGED:" "$AGENCY_DIR/inbox.md" 2>/dev/null | tail -1 | sed 's/## TRIAGED: //')
+        if [[ -n "$triaged" ]]; then
+            log_event "✓ " "$GREEN" "PO triaged: $triaged"
+        fi
+    fi
+}
+
+check_backlog_changes() {
+    local new_checksum=$(get_checksum "$AGENCY_DIR/backlog.md")
+    if [[ "${FILE_CHECKSUMS["backlog"]}" != "$new_checksum" ]]; then
+        FILE_CHECKSUMS["backlog"]="$new_checksum"
+
+        # Check for state changes
+        local ready=$(grep -c "## READY:" "$AGENCY_DIR/backlog.md" 2>/dev/null || echo 0)
+        local in_progress=$(grep "## IN_PROGRESS:" "$AGENCY_DIR/backlog.md" 2>/dev/null | tail -1)
+        local done=$(grep "## DONE:" "$AGENCY_DIR/backlog.md" 2>/dev/null | tail -1)
+        local shipped=$(grep "## SHIPPED:" "$AGENCY_DIR/backlog.md" 2>/dev/null | tail -1)
+
+        if [[ -n "$in_progress" ]]; then
+            local task=$(echo "$in_progress" | sed 's/## IN_PROGRESS: //')
+            log_event "🔨" "$GREEN" "Work started: $task"
+        fi
+        if [[ -n "$done" ]]; then
+            local task=$(echo "$done" | sed 's/## DONE: //')
+            log_event "✅" "$CYAN" "Completed: $task"
+        fi
+        if [[ -n "$shipped" ]]; then
+            local task=$(echo "$shipped" | sed 's/## SHIPPED: //')
+            log_event "🚀" "$BOLD" "SHIPPED: $task"
+        fi
+        if [[ "$ready" -gt 0 ]]; then
+            log_event "📋" "$YELLOW" "Backlog: $ready item(s) ready for claiming"
+        fi
+    fi
+}
+
+check_standup_changes() {
+    local new_checksum=$(get_checksum "$AGENCY_DIR/standup.md")
+    if [[ "${FILE_CHECKSUMS["standup"]}" != "$new_checksum" ]]; then
+        FILE_CHECKSUMS["standup"]="$new_checksum"
+
+        # Check for blockers
+        if grep -q "BLOCKED:" "$AGENCY_DIR/standup.md" 2>/dev/null; then
+            local blocker=$(grep -A 1 "BLOCKED:" "$AGENCY_DIR/standup.md" | tail -1)
+            log_event "🚫" "$RED" "BLOCKED: $blocker"
+        fi
+
+        # Check who's working
+        for agent in "${AGENTS[@]}"; do
+            local status=$(grep -A 2 "## $agent" "$AGENCY_DIR/standup.md" 2>/dev/null | grep "Status:" | sed 's/\*\*Status:\*\* //')
+            if [[ "$status" == "Building" ]]; then
+                local working=$(grep -A 3 "## $agent" "$AGENCY_DIR/standup.md" 2>/dev/null | grep "Working on:" | sed 's/\*\*Working on:\*\* //')
+                if [[ -n "$working" && "$working" != "--" ]]; then
+                    log_event "⚡" "${AGENT_COLORS[$agent]:-$NC}" "$agent: $working"
+                fi
+            fi
+        done
+    fi
+}
+
+check_handoffs() {
+    local handoff_count=$(ls "$AGENCY_DIR/handoffs/"*.md 2>/dev/null | grep -v gitkeep | wc -l || echo 0)
+    if [[ "$handoff_count" -gt 0 ]]; then
+        for f in "$AGENCY_DIR/handoffs/"*.md; do
+            [[ -f "$f" ]] || continue
+            [[ "$f" == *".gitkeep" ]] && continue
+            local basename=$(basename "$f")
+            local checksum=$(get_checksum "$f")
+            if [[ "${FILE_CHECKSUMS["$basename"]}" != "$checksum" ]]; then
+                FILE_CHECKSUMS["$basename"]="$checksum"
+                log_event "📨" "$BLUE" "Handoff: $basename"
+            fi
+        done
+    fi
+}
+
+watch_loop() {
+    banner
+    echo -e "${BOLD}Live Activity Log${NC} (Ctrl+C to stop)"
+    echo -e "${YELLOW}No token usage - just watching files${NC}"
+    echo ""
+    echo "─────────────────────────────────────────────────────────────"
+
+    init_checksums
+
+    while true; do
+        check_inbox_changes
+        check_backlog_changes
+        check_standup_changes
+        check_handoffs
+        sleep 2
+    done
+}
+
+# ============================================================================
+
 usage() {
     banner
     echo "Usage: $0 [command]"
@@ -209,6 +350,7 @@ usage() {
     echo "Commands:"
     echo "  start           Start all agents in background"
     echo "  stop            Stop all agents"
+    echo "  watch           Live activity log (no token usage)"
     echo "  status          Show agent status and DORA metrics"
     echo "  <agent-name>    Run single agent in foreground"
     echo ""
@@ -217,7 +359,7 @@ usage() {
     echo "Quick start:"
     echo "  1. Add a request to: $AGENCY_DIR/inbox.md"
     echo "  2. Run: $0 start"
-    echo "  3. Watch: $AGENCY_DIR/backlog.md and $AGENCY_DIR/standup.md"
+    echo "  3. Run: $0 watch   # See live activity"
     echo ""
 }
 
@@ -227,6 +369,10 @@ case "${1:-start}" in
         ;;
     stop)
         stop_all
+        ;;
+    watch)
+        trap 'echo ""; echo -e "${YELLOW}Watch stopped.${NC}"; exit 0' INT TERM
+        watch_loop
         ;;
     status)
         show_status
