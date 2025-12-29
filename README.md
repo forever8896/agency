@@ -23,11 +23,15 @@ The Agency is a framework for running multiple AI agents as a coordinated softwa
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/agency.git
+git clone https://github.com/forever8896/agency.git
 cd agency
 
-# Add your first request
+# Initialize the data directory (creates .agency/data/ with templates)
+./agency.sh status
+
+# Add your first request to the inbox
 cat >> .agency/data/inbox.md << 'EOF'
+
 ## NEW: Build a simple CLI todo app
 **Priority:** high
 **Description:** Command-line todo app with add, list, complete, delete
@@ -39,9 +43,6 @@ EOF
 
 # Watch live activity (no token usage)
 ./agency.sh watch
-
-# Or check status
-./agency.sh status
 ```
 
 ## How It Works
