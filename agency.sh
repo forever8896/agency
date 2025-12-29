@@ -37,7 +37,7 @@ set -e
 AGENCY_DIR="${AGENCY_DIR:-$(dirname "$(realpath "$0")")}"
 
 # Runtime data directory (gitignored, contains actual work state)
-DATA_DIR="${DATA_DIR:-$AGENCY_DIR/.agency/data}"
+DATA_DIR="${DATA_DIR:-$AGENCY_DIR/agency/data}"
 
 # Where agents create actual code projects (not specs)
 PROJECTS_DIR="${PROJECTS_DIR:-$HOME/projects}"
@@ -51,9 +51,10 @@ export AGENCY_DIR DATA_DIR PROJECTS_DIR POLL_INTERVAL
 PID_DIR="$AGENCY_DIR/.pids"
 
 # Squad composition based on research:
-# - 5-6 devs per 1-2 QA (we have 3 devs + tech-lead who can code = ~4 builders)
+# - 3 devs + tech-lead who can code = 4 parallel builders
 # - Cross-functional team with end-to-end ownership
-AGENTS=("product-owner" "tech-lead" "dev-alpha" "dev-beta" "dev-gamma" "qa" "devops")
+# - Devs self-test, no QA bottleneck
+AGENTS=("product-owner" "tech-lead" "dev-alpha" "dev-beta" "dev-gamma" "devops")
 
 # Colors
 RED='\033[0;31m'
@@ -72,12 +73,14 @@ declare -A AGENT_COLORS=(
     ["dev-alpha"]="$GREEN"
     ["dev-beta"]="$GREEN"
     ["dev-gamma"]="$GREEN"
-    ["qa"]="$YELLOW"
     ["devops"]="$CYAN"
 )
 
 mkdir -p "$PID_DIR"
 mkdir -p "$DATA_DIR"
+mkdir -p "$DATA_DIR/handoffs"
+mkdir -p "$DATA_DIR/projects"
+mkdir -p "$DATA_DIR/knowledge"
 
 # Initialize data files from templates if they don't exist
 init_data() {
@@ -102,13 +105,13 @@ banner() {
     echo "║               Squad Model - Data-Driven Design                     ║"
     echo "║                                                                    ║"
     echo "╠════════════════════════════════════════════════════════════════════╣"
-    echo "║  PO │ Tech Lead │ Dev α │ Dev β │ Dev γ │ QA │ DevOps             ║"
+    echo "║  PO │ Tech Lead │ Dev α │ Dev β │ Dev γ │ DevOps                 ║"
     echo "╚════════════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
     echo -e "${YELLOW}Research-backed improvements:${NC}"
-    echo "  • 3 developers (vs 1) - optimal dev:QA ratio"
+    echo "  • 3 developers (vs 1) - parallel building capacity"
     echo "  • Async standups - saves ~4 hrs/week interrupt cost"
-    echo "  • Selective QA - not every change needs full testing"
+    echo "  • Self-testing devs - no QA bottleneck"
     echo "  • Direct claiming - reduced handoff bottlenecks"
     echo "  • DORA metrics - tracking what matters"
     echo "  • Stateless agents - spawn fresh, exit when done (token efficient)"
@@ -327,9 +330,9 @@ check_standup_changes() {
 }
 
 check_handoffs() {
-    local handoff_count=$(ls "$AGENCY_DIR/handoffs/"*.md 2>/dev/null | grep -v gitkeep | wc -l || echo 0)
+    local handoff_count=$(ls "$DATA_DIR/handoffs/"*.md 2>/dev/null | grep -v gitkeep | wc -l || echo 0)
     if [[ "$handoff_count" -gt 0 ]]; then
-        for f in "$AGENCY_DIR/handoffs/"*.md; do
+        for f in "$DATA_DIR/handoffs/"*.md; do
             [[ -f "$f" ]] || continue
             [[ "$f" == *".gitkeep" ]] && continue
             local basename=$(basename "$f")
@@ -399,7 +402,7 @@ case "${1:-start}" in
     help|--help|-h)
         usage
         ;;
-    product-owner|tech-lead|dev-alpha|dev-beta|dev-gamma|qa|devops)
+    product-owner|tech-lead|dev-alpha|dev-beta|dev-gamma|devops)
         run_single "$1"
         ;;
     *)

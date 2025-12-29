@@ -42,7 +42,7 @@ Before marking done:
 - [ ] No console errors/warnings
 - [ ] Changes committed with clear message
 
-If `QA Required: yes` was set, create handoff to QA. Otherwise, you're done.
+Once self-tested, you're done - devs own quality end-to-end.
 
 ## Completion Format
 

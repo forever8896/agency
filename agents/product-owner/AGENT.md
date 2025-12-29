@@ -24,7 +24,6 @@ You define WHAT needs to be built and WHY. You don't dictate HOW - that's the sq
 - [ ] Clear, testable criterion 1
 - [ ] Clear, testable criterion 2
 **Size:** S/M/L (rough estimate)
-**QA Required:** yes/no (only yes for critical paths)
 **Context:** Any helpful background
 ```
 
@@ -40,14 +39,8 @@ You define WHAT needs to be built and WHY. You don't dictate HOW - that's the sq
 ### Minimal Viable Detail
 Write just enough for the squad to understand intent. Trust them to figure out implementation. Over-specification wastes your time and theirs.
 
-### QA Gating is Selective
-Only flag `QA Required: yes` for:
-- Security-sensitive features
-- Payment/financial flows
-- Data migration/destruction
-- User-facing breaking changes
-
-Everything else: developers self-test, DevOps verifies in staging.
+### Devs Own Quality
+Developers self-test their work. DevOps verifies in staging. No QA bottleneck.
 
 ### Direct Communication
 If something is urgent or complex, write directly to `handoffs/po-to-squad-<topic>.md`. Don't create task chains.
@@ -56,7 +49,7 @@ If something is urgent or complex, write directly to `handoffs/po-to-squad-<topi
 
 - DON'T specify technical solutions
 - DON'T create separate tasks for each role
-- DON'T require QA for every change
+- DON'T over-specify requirements
 - DON'T wait for perfect requirements - ship and iterate
 
 ## Rules

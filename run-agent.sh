@@ -20,7 +20,7 @@ set -e
 AGENCY_DIR="${AGENCY_DIR:-$(dirname "$(realpath "$0")")}"
 
 # Runtime data directory (gitignored, contains actual work state)
-DATA_DIR="${DATA_DIR:-$AGENCY_DIR/.agency/data}"
+DATA_DIR="${DATA_DIR:-$AGENCY_DIR/agency/data}"
 
 # Where to create actual code projects (not specs, real code)
 PROJECTS_DIR="${PROJECTS_DIR:-$HOME/projects}"
@@ -47,7 +47,6 @@ declare -A AGENT_COLORS=(
     ["dev-alpha"]="$GREEN"
     ["dev-beta"]="$GREEN"
     ["dev-gamma"]="$GREEN"
-    ["qa"]="$YELLOW"
     ["devops"]="$CYAN"
 )
 
@@ -71,7 +70,6 @@ usage() {
     echo "  dev-alpha     - Builder (general)"
     echo "  dev-beta      - Builder (backend/optimization focus)"
     echo "  dev-gamma     - Builder (frontend/UX focus)"
-    echo "  qa            - Selective testing for critical paths"
     echo "  devops        - Deployment, monitoring, DORA metrics"
     exit 1
 }
@@ -108,9 +106,6 @@ has_work() {
         dev-alpha|dev-beta|dev-gamma)
             grep -q "## READY:" "$DATA_DIR/backlog.md" 2>/dev/null
             ;;
-        qa)
-            ls "$AGENCY_DIR/handoffs/"dev-to-qa-*.md 2>/dev/null | head -1 | grep -q . 2>/dev/null
-            ;;
         devops)
             grep -q "## DONE:" "$DATA_DIR/backlog.md" 2>/dev/null
             ;;
@@ -139,7 +134,7 @@ build_prompt() {
 - Standup: $DATA_DIR/standup.md
 - Board: $DATA_DIR/board.md
 - Metrics: $DATA_DIR/metrics.md
-- Handoffs: $AGENCY_DIR/handoffs/
+- Handoffs: $DATA_DIR/handoffs/
 
 ## Current Time
 $(date '+%Y-%m-%d %H:%M:%S')

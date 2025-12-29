@@ -4,7 +4,7 @@ An autonomous multi-agent development team powered by Claude Code - redesigned b
 
 ## Overview
 
-The Agency is a framework for running multiple AI agents as a coordinated software development team. Each agent has a specialized role (Product Owner, Tech Lead, Developers, QA, DevOps) and they communicate through shared markdown files - enabling full observability and human intervention at any point.
+The Agency is a framework for running multiple AI agents as a coordinated software development team. Each agent has a specialized role (Product Owner, Tech Lead, Developers, DevOps) and they communicate through shared markdown files - enabling full observability and human intervention at any point.
 
 **Key Features:**
 - **Autonomous operation** - Agents poll for work and execute independently
@@ -26,11 +26,11 @@ The Agency is a framework for running multiple AI agents as a coordinated softwa
 git clone https://github.com/forever8896/agency.git
 cd agency
 
-# Initialize the data directory (creates .agency/data/ with templates)
+# Initialize the data directory (creates agency/data/ with templates)
 ./agency.sh status
 
 # Add your first request to the inbox
-cat >> .agency/data/inbox.md << 'EOF'
+cat >> agency/data/inbox.md << 'EOF'
 
 ## NEW: Build a simple CLI todo app
 **Priority:** high
@@ -57,13 +57,15 @@ agency/
 ├── standup.md            # Template: standup format
 ├── metrics.md            # Template: DORA metrics explanation
 │
-├── .agency/
-│   └── data/             # Runtime state (gitignored)
-│       ├── inbox.md      # Active requests
-│       ├── backlog.md    # Work items in progress
-│       ├── board.md      # Current kanban state
-│       ├── standup.md    # Agent status updates
-│       └── metrics.md    # Tracked metrics
+├── agency/data/          # Runtime state (gitignored)
+│   ├── inbox.md          # Active requests
+│   ├── backlog.md        # Work items in progress
+│   ├── board.md          # Current kanban state
+│   ├── standup.md        # Agent status updates
+│   ├── metrics.md        # Tracked metrics
+│   ├── handoffs/         # Inter-agent communication
+│   ├── projects/         # Project specifications
+│   └── knowledge/        # Shared knowledge base
 │
 ├── agents/               # Agent definitions (AGENT.md prompts)
 │   ├── product-owner/
@@ -71,10 +73,8 @@ agency/
 │   ├── dev-alpha/
 │   ├── dev-beta/
 │   ├── dev-gamma/
-│   ├── qa/
 │   └── devops/
 │
-├── handoffs/             # Inter-agent communication (gitignored)
 ├── agency.sh             # Main orchestrator
 └── run-agent.sh          # Individual agent runner
 ```
@@ -86,11 +86,11 @@ The Agency separates **templates** (tracked in git) from **runtime data** (gitig
 | Location | Purpose | Git Status |
 |----------|---------|------------|
 | `inbox.md` | Template showing request format | Tracked |
-| `.agency/data/inbox.md` | Your actual requests | Ignored |
+| `agency/data/inbox.md` | Your actual requests | Ignored |
 | `backlog.md` | Template showing workflow | Tracked |
-| `.agency/data/backlog.md` | Your actual work items | Ignored |
+| `agency/data/backlog.md` | Your actual work items | Ignored |
 
-**On first run**, templates are automatically copied to `.agency/data/` if no data exists. This means:
+**On first run**, templates are automatically copied to `agency/data/` if no data exists. This means:
 - New users get clean templates with documentation
 - Your work state persists across sessions
 - Git stays clean - no accidental commits of work-in-progress
@@ -98,8 +98,8 @@ The Agency separates **templates** (tracked in git) from **runtime data** (gitig
 ### Workflow
 
 ```
-1. You add request    →  .agency/data/inbox.md (## NEW:)
-2. PO triages         →  .agency/data/backlog.md (## READY:)
+1. You add request    →  agency/data/inbox.md (## NEW:)
+2. PO triages         →  agency/data/backlog.md (## READY:)
 3. Dev claims work    →  ## IN_PROGRESS: @dev-alpha
 4. Dev completes      →  ## DONE: @dev-alpha
 5. DevOps deploys     →  ## SHIPPED:
@@ -121,7 +121,7 @@ Configure via environment variables:
 # Agency files location (default: script directory)
 export AGENCY_DIR=~/path/to/agency
 
-# Runtime data location (default: $AGENCY_DIR/.agency/data)
+# Runtime data location (default: $AGENCY_DIR/agency/data)
 export DATA_DIR=~/path/to/data
 
 # Where agents create code projects (default: ~/projects)
@@ -152,7 +152,7 @@ AGENCY_DIR=~/obsidian/Agency ./agency.sh start
 ./agency.sh <agent>     # Run single agent in foreground (for debugging)
 ```
 
-Available agents: `product-owner`, `tech-lead`, `dev-alpha`, `dev-beta`, `dev-gamma`, `qa`, `devops`
+Available agents: `product-owner`, `tech-lead`, `dev-alpha`, `dev-beta`, `dev-gamma`, `devops`
 
 ## The Squad
 
@@ -181,11 +181,6 @@ Available agents: `product-owner`, `tech-lead`, `dev-alpha`, `dev-beta`, `dev-ga
 │    │     │     │                                               │
 │    └─────┼─────┘                                               │
 │          │                                                     │
-│          ▼         (only if flagged)                           │
-│   ┌─────────────┐  - - - - - - - - - ┐                         │
-│   │ QA          │◄ - Security/payment │ Selective, not gate    │
-│   └─────────────┘  - - - - - - - - - ┘                         │
-│          │                                                     │
 │          ▼                                                     │
 │   ┌─────────────┐                                              │
 │   │ DevOps      │─── Deploys, monitors, tracks DORA            │
@@ -200,9 +195,9 @@ Three files to monitor your squad:
 
 | File | What to Watch |
 |------|---------------|
-| `.agency/data/standup.md` | Real-time agent status, blockers |
-| `.agency/data/backlog.md` | Work states: Ready → In Progress → Done |
-| `.agency/data/metrics.md` | DORA metrics: deployment frequency, lead time |
+| `agency/data/standup.md` | Real-time agent status, blockers |
+| `agency/data/backlog.md` | Work states: Ready → In Progress → Done |
+| `agency/data/metrics.md` | DORA metrics: deployment frequency, lead time |
 
 Use watch mode for live updates without token usage:
 ```bash
@@ -215,9 +210,9 @@ Use watch mode for live updates without token usage:
 
 | v1 Problem | Research Finding | v2 Solution |
 |------------|-----------------|-------------|
-| 1 developer | 5-6 devs per 1-2 QA is optimal | 3 developers + tech lead who can code |
+| 1 developer | More builders = more throughput | 3 developers + tech lead who can code |
 | 4 handoffs per task | Handoffs are "silent killers" | Direct claiming, 1-2 handoffs max |
-| QA gates everything | Only 20-25% of effort should be QA | Selective QA for critical paths only |
+| QA bottleneck | Devs should own quality end-to-end | Self-testing devs, no QA gate |
 | No real standups | Async saves ~4 hrs/week | Real async standup with blockers |
 | No metrics | DORA metrics correlate with performance | Built-in DORA tracking |
 
@@ -227,7 +222,6 @@ Use watch mode for live updates without token usage:
 - [Spotify Squad Model](https://engineering.atspotify.com/) - Cross-functional autonomous teams
 - [Amazon Two-Pizza Teams](https://www.thesandreckoner.co.uk/how-google-amazon-and-spotify-set-up-their-teams-for-success/) - Max 7 people with end-to-end ownership
 - [Handoffs Research](https://www.scrum.org/resources/blog/why-handoffs-are-killing-your-agility) - Each handoff is a failure point
-- [Developer:QA Ratio Studies](https://www.prolifics-testing.com/news/optimal-tester-to-developer-ratios) - 5-6 devs per 1-2 testers
 - [Async Standup Research](https://www.parabol.co/blog/virtual-standups-vs-async-standups/) - 23 min focus recovery per interrupt
 
 ### DORA Metrics
@@ -290,7 +284,7 @@ Run a single agent in foreground to see its output:
 Check agent logs:
 ```bash
 # Agents run via nohup, check standup.md for status
-cat .agency/data/standup.md
+cat agency/data/standup.md
 ```
 
 ## Philosophy
