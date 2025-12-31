@@ -56,6 +56,26 @@ Real-time status from each squad member. Update when you start/finish work.
 
 ---
 
+## qa
+**Status:** Idle
+**Working on:** --
+**Completed:** --
+**Blockers:** None
+**Next:** --
+*Updated: --*
+
+---
+
+## reviewer
+**Status:** Idle
+**Working on:** --
+**Completed:** --
+**Blockers:** None
+**Next:** --
+*Updated: --*
+
+---
+
 ## devops
 **Status:** Idle
 **Working on:** --

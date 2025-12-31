@@ -50,11 +50,12 @@ export AGENCY_DIR DATA_DIR PROJECTS_DIR POLL_INTERVAL
 
 PID_DIR="$AGENCY_DIR/.pids"
 
-# Squad composition based on research:
+# Squad composition:
 # - 3 devs + tech-lead who can code = 4 parallel builders
 # - Cross-functional team with end-to-end ownership
-# - Devs self-test, no QA bottleneck
-AGENTS=("product-owner" "tech-lead" "dev-alpha" "dev-beta" "dev-gamma" "devops")
+# - QA as mandatory quality gate before shipping
+# - Reviewer for code quality (optional, triggered when flagged)
+AGENTS=("product-owner" "tech-lead" "dev-alpha" "dev-beta" "dev-gamma" "qa" "reviewer" "devops")
 
 # Colors
 RED='\033[0;31m'
@@ -73,6 +74,8 @@ declare -A AGENT_COLORS=(
     ["dev-alpha"]="$GREEN"
     ["dev-beta"]="$GREEN"
     ["dev-gamma"]="$GREEN"
+    ["qa"]="$YELLOW"
+    ["reviewer"]="$MAGENTA"
     ["devops"]="$CYAN"
 )
 
@@ -98,23 +101,26 @@ init_data
 
 banner() {
     echo -e "${BOLD}${CYAN}"
-    echo "╔════════════════════════════════════════════════════════════════════╗"
-    echo "║                                                                    ║"
-    echo "║                      THE AGENCY v2                                 ║"
-    echo "║                                                                    ║"
-    echo "║               Squad Model - Data-Driven Design                     ║"
-    echo "║                                                                    ║"
-    echo "╠════════════════════════════════════════════════════════════════════╣"
-    echo "║  PO │ Tech Lead │ Dev α │ Dev β │ Dev γ │ DevOps                 ║"
-    echo "╚════════════════════════════════════════════════════════════════════╝"
+    echo "╔══════════════════════════════════════════════════════════════════════════════╗"
+    echo "║                                                                              ║"
+    echo "║                            THE AGENCY v2                                     ║"
+    echo "║                                                                              ║"
+    echo "║                   Squad Model - Quality-First Design                         ║"
+    echo "║                                                                              ║"
+    echo "╠══════════════════════════════════════════════════════════════════════════════╣"
+    echo "║  PO │ Tech Lead │ Dev α │ Dev β │ Dev γ │ QA │ Reviewer │ DevOps           ║"
+    echo "╚══════════════════════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
-    echo -e "${YELLOW}Research-backed improvements:${NC}"
-    echo "  • 3 developers (vs 1) - parallel building capacity"
+    echo -e "${YELLOW}Workflow:${NC}"
+    echo "  Inbox → PO triages → Devs build → QA verifies → Reviewer (optional) → DevOps ships"
+    echo ""
+    echo -e "${YELLOW}Key features:${NC}"
+    echo "  • 3 developers - parallel building capacity"
+    echo "  • QA gate - mandatory verification before shipping"
+    echo "  • Code review - optional, for complex/sensitive changes"
     echo "  • Async standups - saves ~4 hrs/week interrupt cost"
-    echo "  • Self-testing devs - no QA bottleneck"
-    echo "  • Direct claiming - reduced handoff bottlenecks"
     echo "  • DORA metrics - tracking what matters"
-    echo "  • Stateless agents - spawn fresh, exit when done (token efficient)"
+    echo "  • Stateless agents - token efficient"
     echo ""
     echo -e "${BLUE}Configuration:${NC}"
     echo "  AGENCY_DIR=$AGENCY_DIR"
@@ -285,6 +291,11 @@ check_backlog_changes() {
         local ready=$(grep -c "## READY:" "$DATA_DIR/backlog.md" 2>/dev/null || echo 0)
         local in_progress=$(grep "## IN_PROGRESS:" "$DATA_DIR/backlog.md" 2>/dev/null | tail -1)
         local done=$(grep "## DONE:" "$DATA_DIR/backlog.md" 2>/dev/null | tail -1)
+        local qa_testing=$(grep "## QA_TESTING:" "$DATA_DIR/backlog.md" 2>/dev/null | tail -1)
+        local qa_passed=$(grep "## QA_PASSED:" "$DATA_DIR/backlog.md" 2>/dev/null | tail -1)
+        local qa_failed=$(grep "## QA_FAILED:" "$DATA_DIR/backlog.md" 2>/dev/null | tail -1)
+        local reviewing=$(grep "## REVIEWING:" "$DATA_DIR/backlog.md" 2>/dev/null | tail -1)
+        local reviewed=$(grep "## REVIEWED:" "$DATA_DIR/backlog.md" 2>/dev/null | tail -1)
         local shipped=$(grep "## SHIPPED:" "$DATA_DIR/backlog.md" 2>/dev/null | tail -1)
 
         if [[ -n "$in_progress" ]]; then
@@ -293,7 +304,27 @@ check_backlog_changes() {
         fi
         if [[ -n "$done" ]]; then
             local task=$(echo "$done" | sed 's/## DONE: //')
-            log_event "✅" "$CYAN" "Completed: $task"
+            log_event "✅" "$GREEN" "Dev completed: $task"
+        fi
+        if [[ -n "$qa_testing" ]]; then
+            local task=$(echo "$qa_testing" | sed 's/## QA_TESTING: //')
+            log_event "🔍" "$YELLOW" "QA testing: $task"
+        fi
+        if [[ -n "$qa_passed" ]]; then
+            local task=$(echo "$qa_passed" | sed 's/## QA_PASSED: //')
+            log_event "✓ " "$YELLOW" "QA passed: $task"
+        fi
+        if [[ -n "$qa_failed" ]]; then
+            local task=$(echo "$qa_failed" | sed 's/## QA_FAILED: //')
+            log_event "✗ " "$RED" "QA FAILED: $task"
+        fi
+        if [[ -n "$reviewing" ]]; then
+            local task=$(echo "$reviewing" | sed 's/## REVIEWING: //')
+            log_event "📖" "$MAGENTA" "Reviewing: $task"
+        fi
+        if [[ -n "$reviewed" ]]; then
+            local task=$(echo "$reviewed" | sed 's/## REVIEWED: //')
+            log_event "✓ " "$MAGENTA" "Review approved: $task"
         fi
         if [[ -n "$shipped" ]]; then
             local task=$(echo "$shipped" | sed 's/## SHIPPED: //')
@@ -402,7 +433,7 @@ case "${1:-start}" in
     help|--help|-h)
         usage
         ;;
-    product-owner|tech-lead|dev-alpha|dev-beta|dev-gamma|devops)
+    product-owner|tech-lead|dev-alpha|dev-beta|dev-gamma|qa|reviewer|devops)
         run_single "$1"
         ;;
     *)

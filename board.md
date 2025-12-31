@@ -11,10 +11,16 @@ Squad Kanban - see `backlog.md` for details, `standup.md` for who's doing what.
 <!-- Triaged, waiting for dev to claim -->
 
 ## In Progress
-<!-- Actively being worked on -->
+<!-- Actively being worked on by devs -->
 
-## Done
-<!-- Completed, waiting for DevOps deploy -->
+## Done (Awaiting QA)
+<!-- Completed by dev, waiting for QA verification -->
+
+## QA Passed
+<!-- Verified working, ready for deploy (or review if flagged) -->
+
+## Under Review
+<!-- Being reviewed for code quality (optional) -->
 
 ## Shipped
 <!-- Live in production -->

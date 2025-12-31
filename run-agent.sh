@@ -47,6 +47,8 @@ declare -A AGENT_COLORS=(
     ["dev-alpha"]="$GREEN"
     ["dev-beta"]="$GREEN"
     ["dev-gamma"]="$GREEN"
+    ["qa"]="$YELLOW"
+    ["reviewer"]="$MAGENTA"
     ["devops"]="$CYAN"
 )
 
@@ -70,6 +72,8 @@ usage() {
     echo "  dev-alpha     - Builder (general)"
     echo "  dev-beta      - Builder (backend/optimization focus)"
     echo "  dev-gamma     - Builder (frontend/UX focus)"
+    echo "  qa            - Quality gate, verifies work before shipping"
+    echo "  reviewer      - Code quality reviews (optional)"
     echo "  devops        - Deployment, monitoring, DORA metrics"
     exit 1
 }
@@ -106,8 +110,21 @@ has_work() {
         dev-alpha|dev-beta|dev-gamma)
             grep -q "## READY:" "$DATA_DIR/backlog.md" 2>/dev/null
             ;;
-        devops)
+        qa)
+            # QA verifies completed work before shipping
             grep -q "## DONE:" "$DATA_DIR/backlog.md" 2>/dev/null
+            ;;
+        reviewer)
+            # Reviewer handles QA_PASSED items flagged for review, or explicit review requests
+            grep -q "## QA_PASSED:.*Review Required: yes" "$DATA_DIR/backlog.md" 2>/dev/null || \
+            grep -q "Review Required: yes" "$DATA_DIR/backlog.md" 2>/dev/null && \
+            grep -q "## QA_PASSED:" "$DATA_DIR/backlog.md" 2>/dev/null || \
+            ls "$DATA_DIR/handoffs/review-request-"*.md >/dev/null 2>&1
+            ;;
+        devops)
+            # DevOps ships QA_PASSED items (no review) or REVIEWED items (review done)
+            grep -q "## QA_PASSED:" "$DATA_DIR/backlog.md" 2>/dev/null || \
+            grep -q "## REVIEWED:" "$DATA_DIR/backlog.md" 2>/dev/null
             ;;
         *)
             return 1

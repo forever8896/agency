@@ -1,16 +1,16 @@
 # The Agency v2: Squad Model
 
-An autonomous multi-agent development team powered by Claude Code - redesigned based on data-driven research.
+An autonomous multi-agent development team powered by Claude Code - with quality gates to ensure nothing ships broken.
 
 ## Overview
 
-The Agency is a framework for running multiple AI agents as a coordinated software development team. Each agent has a specialized role (Product Owner, Tech Lead, Developers, DevOps) and they communicate through shared markdown files - enabling full observability and human intervention at any point.
+The Agency is a framework for running multiple AI agents as a coordinated software development team. Each agent has a specialized role (Product Owner, Tech Lead, Developers, QA, Reviewer, DevOps) and they communicate through shared markdown files - enabling full observability and human intervention at any point.
 
 **Key Features:**
+- **Quality-first** - Mandatory QA gate verifies work before shipping
 - **Autonomous operation** - Agents poll for work and execute independently
 - **Human-readable state** - All coordination happens via markdown files you can read/edit
 - **Token efficient** - Stateless agents spawn fresh for each task, no accumulated context
-- **Research-backed** - Team structure based on DORA, Spotify, and Amazon research
 - **Git-friendly** - Templates tracked in git, runtime state gitignored
 
 ## Requirements
@@ -73,6 +73,8 @@ agency/
 │   ├── dev-alpha/
 │   ├── dev-beta/
 │   ├── dev-gamma/
+│   ├── qa/
+│   ├── reviewer/
 │   └── devops/
 │
 ├── agency.sh             # Main orchestrator
@@ -102,7 +104,9 @@ The Agency separates **templates** (tracked in git) from **runtime data** (gitig
 2. PO triages         →  agency/data/backlog.md (## READY:)
 3. Dev claims work    →  ## IN_PROGRESS: @dev-alpha
 4. Dev completes      →  ## DONE: @dev-alpha
-5. DevOps deploys     →  ## SHIPPED:
+5. QA verifies        →  ## QA_PASSED: @qa  (or ## QA_FAILED:)
+6. Reviewer (if req)  →  ## REVIEWED: @reviewer
+7. DevOps deploys     →  ## SHIPPED:
 ```
 
 Work items flow through states via markdown headers:
@@ -110,7 +114,12 @@ Work items flow through states via markdown headers:
 - `## TRIAGED:` - PO has reviewed and added context
 - `## READY:` - In backlog, available for claiming
 - `## IN_PROGRESS: @agent` - Being worked on
-- `## DONE: @agent` - Completed, awaiting deployment
+- `## DONE: @agent` - Completed, awaiting QA
+- `## QA_TESTING: @qa` - Being verified by QA
+- `## QA_PASSED: @qa` - Verified working
+- `## QA_FAILED: @qa` - Failed verification (returns to dev)
+- `## REVIEWING: @reviewer` - Under code review
+- `## REVIEWED: @reviewer` - Code review approved
 - `## SHIPPED:` - Live in production
 
 ## Configuration
@@ -152,41 +161,52 @@ AGENCY_DIR=~/obsidian/Agency ./agency.sh start
 ./agency.sh <agent>     # Run single agent in foreground (for debugging)
 ```
 
-Available agents: `product-owner`, `tech-lead`, `dev-alpha`, `dev-beta`, `dev-gamma`, `devops`
+Available agents: `product-owner`, `tech-lead`, `dev-alpha`, `dev-beta`, `dev-gamma`, `qa`, `reviewer`, `devops`
 
 ## The Squad
 
 ```
-┌────────────────────────────────────────────────────────────────┐
-│                        THE AGENCY v2                           │
-│                      Squad Model                               │
-├────────────────────────────────────────────────────────────────┤
-│                                                                │
-│   ┌─────────────┐                                              │
-│   │ Product     │─── Triages inbox, defines acceptance         │
-│   │ Owner       │    criteria, prioritizes backlog             │
-│   └─────────────┘                                              │
-│          │                                                     │
-│          ▼                                                     │
-│   ┌─────────────┐                                              │
-│   │ Tech Lead   │─── Architecture, unblocks devs,              │
-│   │             │    CAN ALSO CODE (playing coach)             │
-│   └─────────────┘                                              │
-│          │                                                     │
-│    ┌─────┼─────┐                                               │
-│    ▼     ▼     ▼                                               │
-│ ┌─────┐┌─────┐┌─────┐                                          │
-│ │Dev α││Dev β││Dev γ│─── Parallel builders, claim              │
-│ └─────┘└─────┘└─────┘    work directly, self-test              │
-│    │     │     │                                               │
-│    └─────┼─────┘                                               │
-│          │                                                     │
-│          ▼                                                     │
-│   ┌─────────────┐                                              │
-│   │ DevOps      │─── Deploys, monitors, tracks DORA            │
-│   └─────────────┘                                              │
-│                                                                │
-└────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           THE AGENCY v2                                  │
+│                    Squad Model - Quality First                           │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│   ┌─────────────┐                                                       │
+│   │ Product     │─── Triages inbox, defines acceptance                  │
+│   │ Owner       │    criteria, prioritizes backlog                      │
+│   └─────────────┘                                                       │
+│          │                                                              │
+│          ▼                                                              │
+│   ┌─────────────┐                                                       │
+│   │ Tech Lead   │─── Architecture, unblocks devs,                       │
+│   │             │    CAN ALSO CODE (playing coach)                      │
+│   └─────────────┘                                                       │
+│          │                                                              │
+│    ┌─────┼─────┐                                                        │
+│    ▼     ▼     ▼                                                        │
+│ ┌─────┐┌─────┐┌─────┐                                                   │
+│ │Dev α││Dev β││Dev γ│─── Parallel builders, claim work directly         │
+│ └─────┘└─────┘└─────┘                                                   │
+│    │     │     │                                                        │
+│    └─────┼─────┘                                                        │
+│          │                                                              │
+│          ▼                                                              │
+│   ┌─────────────┐                                                       │
+│   │     QA      │─── MANDATORY: Verifies work actually works            │
+│   └─────────────┘    before shipping (catches broken code)              │
+│          │                                                              │
+│          ├────────────────────┐                                         │
+│          ▼                    ▼ (if Review Required)                    │
+│   ┌─────────────┐      ┌─────────────┐                                  │
+│   │   DevOps    │      │  Reviewer   │─── Code quality, security,       │
+│   └─────────────┘      └─────────────┘    patterns (optional)           │
+│          │                    │                                         │
+│          ◄────────────────────┘                                         │
+│          │                                                              │
+│          ▼                                                              │
+│      [SHIPPED]─── Deployed to production                                │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Observability
@@ -206,15 +226,26 @@ Use watch mode for live updates without token usage:
 
 ## Research Background
 
-### What Changed from v1?
+### Design Decisions
 
-| v1 Problem | Research Finding | v2 Solution |
-|------------|-----------------|-------------|
-| 1 developer | More builders = more throughput | 3 developers + tech lead who can code |
-| 4 handoffs per task | Handoffs are "silent killers" | Direct claiming, 1-2 handoffs max |
-| QA bottleneck | Devs should own quality end-to-end | Self-testing devs, no QA gate |
+| Challenge | Approach | Solution |
+|-----------|----------|----------|
+| 1 developer bottleneck | More builders = more throughput | 3 developers + tech lead who can code |
+| 4 handoffs per task | Handoffs are "silent killers" | Direct claiming, minimal handoffs |
+| Broken code shipping | Quality gates catch issues early | Mandatory QA verification |
+| Code quality variance | Review catches patterns/security | Optional code review for complex changes |
 | No real standups | Async saves ~4 hrs/week | Real async standup with blockers |
 | No metrics | DORA metrics correlate with performance | Built-in DORA tracking |
+
+### Why QA is Mandatory
+
+While some research suggests eliminating QA gates, in practice with AI agents:
+- Agents can miss edge cases during self-testing
+- "It works on my machine" happens with AI too
+- A quick verification prevents shipping broken code
+- Failed QA loops back to the dev who built it (ownership preserved)
+
+QA is lightweight - verify it works, not exhaustive testing.
 
 ### Research Sources
 

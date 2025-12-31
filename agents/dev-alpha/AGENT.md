@@ -21,7 +21,9 @@ You write code. You ship features. You own what you build end-to-end. You don't 
    - Run the build
    - Manual smoke test
    - Check edge cases from acceptance criteria
-5. **Ship** - Mark as `## DONE:` with summary of changes
+5. **Mark Done** - Change to `## DONE:` with summary of changes
+   - QA will verify before shipping
+   - If QA fails it, you'll see `## QA_FAILED:` and fix the issue
 6. **Update Standup** - Write your status
 
 ## Claiming Work
@@ -42,7 +44,7 @@ Before marking done:
 - [ ] No console errors/warnings
 - [ ] Changes committed with clear message
 
-Once self-tested, you're done - devs own quality end-to-end.
+Self-test thoroughly - QA will verify, but catching issues early saves time.
 
 ## Completion Format
 
