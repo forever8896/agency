@@ -245,19 +245,8 @@ run_single() {
 # WATCH MODE - Live event logging without token usage
 # ============================================================================
 
-# Store file checksums for change detection
-declare -A FILE_CHECKSUMS
-
-get_checksum() {
-    md5sum "$1" 2>/dev/null | cut -d' ' -f1 || echo "none"
-}
-
-init_checksums() {
-    FILE_CHECKSUMS["inbox"]=$(get_checksum "$DATA_DIR/inbox.md")
-    FILE_CHECKSUMS["backlog"]=$(get_checksum "$DATA_DIR/backlog.md")
-    FILE_CHECKSUMS["standup"]=$(get_checksum "$DATA_DIR/standup.md")
-    FILE_CHECKSUMS["board"]=$(get_checksum "$DATA_DIR/board.md")
-}
+# Store previous state for change detection (not just checksums)
+declare -A PREV_STATE
 
 log_event() {
     local icon="$1"
@@ -266,124 +255,129 @@ log_event() {
     echo -e "${color}$icon ${NC}[$(date '+%H:%M:%S')] $message"
 }
 
+# Get all items of a specific state from backlog
+get_items() {
+    local state="$1"
+    grep "## ${state}:" "$DATA_DIR/backlog.md" 2>/dev/null | sort || echo ""
+}
+
+# Initialize previous state (silent - don't report existing items)
+init_state() {
+    PREV_STATE["inbox_new"]=$(grep -c "## NEW:" "$DATA_DIR/inbox.md" 2>/dev/null || echo 0)
+    PREV_STATE["backlog_ready"]=$(get_items "READY")
+    PREV_STATE["backlog_in_progress"]=$(get_items "IN_PROGRESS")
+    PREV_STATE["backlog_done"]=$(get_items "DONE")
+    PREV_STATE["backlog_qa_testing"]=$(get_items "QA_TESTING")
+    PREV_STATE["backlog_qa_passed"]=$(get_items "QA_PASSED")
+    PREV_STATE["backlog_qa_failed"]=$(get_items "QA_FAILED")
+    PREV_STATE["backlog_reviewing"]=$(get_items "REVIEWING")
+    PREV_STATE["backlog_reviewed"]=$(get_items "REVIEWED")
+    PREV_STATE["backlog_shipped"]=$(get_items "SHIPPED")
+    PREV_STATE["standup_md5"]=$(md5sum "$DATA_DIR/standup.md" 2>/dev/null | cut -d' ' -f1 || echo "none")
+    PREV_STATE["handoffs"]=$(ls "$DATA_DIR/handoffs/"*.md 2>/dev/null | grep -v gitkeep | sort || echo "")
+}
+
 check_inbox_changes() {
-    local new_checksum=$(get_checksum "$DATA_DIR/inbox.md")
-    if [[ "${FILE_CHECKSUMS["inbox"]}" != "$new_checksum" ]]; then
-        FILE_CHECKSUMS["inbox"]="$new_checksum"
-        # Check for new requests
-        local new_count=$(grep -c "## NEW:" "$DATA_DIR/inbox.md" 2>/dev/null || echo 0)
-        if [[ "$new_count" -gt 0 ]]; then
-            log_event "📥" "$MAGENTA" "Inbox: $new_count new request(s) waiting"
-        fi
-        local triaged=$(grep "## TRIAGED:" "$DATA_DIR/inbox.md" 2>/dev/null | tail -1 | sed 's/## TRIAGED: //')
-        if [[ -n "$triaged" ]]; then
-            log_event "✓ " "$GREEN" "PO triaged: $triaged"
-        fi
+    local new_count=$(grep -c "## NEW:" "$DATA_DIR/inbox.md" 2>/dev/null || echo 0)
+    local prev_count="${PREV_STATE["inbox_new"]}"
+
+    if [[ "$new_count" -gt "$prev_count" ]]; then
+        local diff=$((new_count - prev_count))
+        log_event "📥" "$MAGENTA" "Inbox: $diff new request(s) added ($new_count total)"
+    fi
+    PREV_STATE["inbox_new"]="$new_count"
+}
+
+# Report only NEW items in a state (items that weren't there before)
+check_state_changes() {
+    local state="$1"
+    local icon="$2"
+    local color="$3"
+    local message="$4"
+    local key="backlog_$(echo "$state" | tr '[:upper:]' '[:lower:]' | tr '-' '_')"
+
+    local current=$(get_items "$state")
+    local previous="${PREV_STATE[$key]}"
+
+    # Find new items (in current but not in previous)
+    if [[ "$current" != "$previous" ]]; then
+        while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+            if ! echo "$previous" | grep -qF "$line"; then
+                local task=$(echo "$line" | sed "s/## ${state}: //")
+                log_event "$icon" "$color" "$message: $task"
+            fi
+        done <<< "$current"
+        PREV_STATE[$key]="$current"
     fi
 }
 
 check_backlog_changes() {
-    local new_checksum=$(get_checksum "$DATA_DIR/backlog.md")
-    if [[ "${FILE_CHECKSUMS["backlog"]}" != "$new_checksum" ]]; then
-        FILE_CHECKSUMS["backlog"]="$new_checksum"
+    check_state_changes "IN_PROGRESS" "🔨" "$GREEN" "Work started"
+    check_state_changes "DONE" "✅" "$GREEN" "Dev completed"
+    check_state_changes "QA_TESTING" "🔍" "$YELLOW" "QA testing"
+    check_state_changes "QA_PASSED" "✓ " "$YELLOW" "QA passed"
+    check_state_changes "QA_FAILED" "✗ " "$RED" "QA FAILED"
+    check_state_changes "REVIEWING" "📖" "$MAGENTA" "Reviewing"
+    check_state_changes "REVIEWED" "✓ " "$MAGENTA" "Review approved"
+    check_state_changes "SHIPPED" "🚀" "$BOLD" "SHIPPED"
 
-        # Check for state changes
-        local ready=$(grep -c "## READY:" "$DATA_DIR/backlog.md" 2>/dev/null || echo 0)
-        local in_progress=$(grep "## IN_PROGRESS:" "$DATA_DIR/backlog.md" 2>/dev/null | tail -1)
-        local done=$(grep "## DONE:" "$DATA_DIR/backlog.md" 2>/dev/null | tail -1)
-        local qa_testing=$(grep "## QA_TESTING:" "$DATA_DIR/backlog.md" 2>/dev/null | tail -1)
-        local qa_passed=$(grep "## QA_PASSED:" "$DATA_DIR/backlog.md" 2>/dev/null | tail -1)
-        local qa_failed=$(grep "## QA_FAILED:" "$DATA_DIR/backlog.md" 2>/dev/null | tail -1)
-        local reviewing=$(grep "## REVIEWING:" "$DATA_DIR/backlog.md" 2>/dev/null | tail -1)
-        local reviewed=$(grep "## REVIEWED:" "$DATA_DIR/backlog.md" 2>/dev/null | tail -1)
-        local shipped=$(grep "## SHIPPED:" "$DATA_DIR/backlog.md" 2>/dev/null | tail -1)
-
-        if [[ -n "$in_progress" ]]; then
-            local task=$(echo "$in_progress" | sed 's/## IN_PROGRESS: //')
-            log_event "🔨" "$GREEN" "Work started: $task"
-        fi
-        if [[ -n "$done" ]]; then
-            local task=$(echo "$done" | sed 's/## DONE: //')
-            log_event "✅" "$GREEN" "Dev completed: $task"
-        fi
-        if [[ -n "$qa_testing" ]]; then
-            local task=$(echo "$qa_testing" | sed 's/## QA_TESTING: //')
-            log_event "🔍" "$YELLOW" "QA testing: $task"
-        fi
-        if [[ -n "$qa_passed" ]]; then
-            local task=$(echo "$qa_passed" | sed 's/## QA_PASSED: //')
-            log_event "✓ " "$YELLOW" "QA passed: $task"
-        fi
-        if [[ -n "$qa_failed" ]]; then
-            local task=$(echo "$qa_failed" | sed 's/## QA_FAILED: //')
-            log_event "✗ " "$RED" "QA FAILED: $task"
-        fi
-        if [[ -n "$reviewing" ]]; then
-            local task=$(echo "$reviewing" | sed 's/## REVIEWING: //')
-            log_event "📖" "$MAGENTA" "Reviewing: $task"
-        fi
-        if [[ -n "$reviewed" ]]; then
-            local task=$(echo "$reviewed" | sed 's/## REVIEWED: //')
-            log_event "✓ " "$MAGENTA" "Review approved: $task"
-        fi
-        if [[ -n "$shipped" ]]; then
-            local task=$(echo "$shipped" | sed 's/## SHIPPED: //')
-            log_event "🚀" "$BOLD" "SHIPPED: $task"
-        fi
-        if [[ "$ready" -gt 0 ]]; then
-            log_event "📋" "$YELLOW" "Backlog: $ready item(s) ready for claiming"
-        fi
+    # Ready count (just show if changed)
+    local ready_count=$(grep -c "## READY:" "$DATA_DIR/backlog.md" 2>/dev/null || echo 0)
+    local prev_ready="${PREV_STATE["backlog_ready_count"]:-0}"
+    if [[ "$ready_count" -gt "$prev_ready" ]]; then
+        log_event "📋" "$YELLOW" "Backlog: $ready_count item(s) ready for claiming"
     fi
+    PREV_STATE["backlog_ready_count"]="$ready_count"
 }
 
 check_standup_changes() {
-    local new_checksum=$(get_checksum "$DATA_DIR/standup.md")
-    if [[ "${FILE_CHECKSUMS["standup"]}" != "$new_checksum" ]]; then
-        FILE_CHECKSUMS["standup"]="$new_checksum"
+    local new_md5=$(md5sum "$DATA_DIR/standup.md" 2>/dev/null | cut -d' ' -f1 || echo "none")
+    local prev_md5="${PREV_STATE["standup_md5"]}"
 
-        # Check for blockers
-        if grep -q "BLOCKED:" "$DATA_DIR/standup.md" 2>/dev/null; then
-            local blocker=$(grep -A 1 "BLOCKED:" "$DATA_DIR/standup.md" | tail -1)
-            log_event "🚫" "$RED" "BLOCKED: $blocker"
-        fi
+    if [[ "$new_md5" != "$prev_md5" ]]; then
+        # Only report blockers (these are always important)
+        local blockers=$(grep "BLOCKED:" "$DATA_DIR/standup.md" 2>/dev/null || echo "")
+        local prev_blockers="${PREV_STATE["standup_blockers"]:-}"
 
-        # Check who's working
-        for agent in "${AGENTS[@]}"; do
-            local status=$(grep -A 2 "## $agent" "$DATA_DIR/standup.md" 2>/dev/null | grep "Status:" | sed 's/\*\*Status:\*\* //')
-            if [[ "$status" == "Building" ]]; then
-                local working=$(grep -A 3 "## $agent" "$DATA_DIR/standup.md" 2>/dev/null | grep "Working on:" | sed 's/\*\*Working on:\*\* //')
-                if [[ -n "$working" && "$working" != "--" ]]; then
-                    log_event "⚡" "${AGENT_COLORS[$agent]:-$NC}" "$agent: $working"
+        if [[ -n "$blockers" && "$blockers" != "$prev_blockers" ]]; then
+            while IFS= read -r line; do
+                [[ -z "$line" ]] && continue
+                if ! echo "$prev_blockers" | grep -qF "$line"; then
+                    log_event "🚫" "$RED" "$line"
                 fi
-            fi
-        done
+            done <<< "$blockers"
+        fi
+        PREV_STATE["standup_blockers"]="$blockers"
+        PREV_STATE["standup_md5"]="$new_md5"
     fi
 }
 
 check_handoffs() {
-    local handoff_count=$(ls "$DATA_DIR/handoffs/"*.md 2>/dev/null | grep -v gitkeep | wc -l || echo 0)
-    if [[ "$handoff_count" -gt 0 ]]; then
-        for f in "$DATA_DIR/handoffs/"*.md; do
-            [[ -f "$f" ]] || continue
-            [[ "$f" == *".gitkeep" ]] && continue
-            local basename=$(basename "$f")
-            local checksum=$(get_checksum "$f")
-            if [[ "${FILE_CHECKSUMS["$basename"]}" != "$checksum" ]]; then
-                FILE_CHECKSUMS["$basename"]="$checksum"
+    local current=$(ls "$DATA_DIR/handoffs/"*.md 2>/dev/null | grep -v gitkeep | sort || echo "")
+    local previous="${PREV_STATE["handoffs"]}"
+
+    if [[ "$current" != "$previous" ]]; then
+        # Find new handoff files
+        while IFS= read -r filepath; do
+            [[ -z "$filepath" ]] && continue
+            if ! echo "$previous" | grep -qF "$filepath"; then
+                local basename=$(basename "$filepath")
                 log_event "📨" "$BLUE" "Handoff: $basename"
             fi
-        done
+        done <<< "$current"
+        PREV_STATE["handoffs"]="$current"
     fi
 }
 
 watch_loop() {
     banner
     echo -e "${BOLD}Live Activity Log${NC} (Ctrl+C to stop)"
-    echo -e "${YELLOW}No token usage - just watching files${NC}"
+    echo -e "${YELLOW}Watching for changes... (only new events shown)${NC}"
     echo ""
     echo "─────────────────────────────────────────────────────────────"
 
-    init_checksums
+    init_state
 
     while true; do
         check_inbox_changes
