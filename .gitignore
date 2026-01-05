@@ -21,3 +21,7 @@ Thumbs.db
 
 # Obsidian session files
 .obsidian/
+
+# SvelteKit build outputs
+.svelte-kit/
+build/
