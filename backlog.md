@@ -42,22 +42,18 @@ Add these to items when creating them:
 ## Ready for Work
 <!-- Devs: claim these by adding @your-name and changing to IN_PROGRESS -->
 
-## QA_PASSED: [P0] Add Educational Tooltips to Finance Dashboard @dev-gamma
-- **Priority**: P0
-- **Assigned**: @dev-gamma
-- **Files**: dashboard/src/routes/finance/+page.svelte, dashboard/src/lib/components/finance/*.svelte, dashboard/src/lib/components/Tooltip.svelte
-- **Summary**: Created finance dashboard page with NetWorthCard and AssetAllocationChart components. Integrated Tooltip component with hover/tap interactions. Added tooltips for "Net Worth", "Asset Allocation", and 5 asset classes (Stocks, Real Estate, Cash, Crypto, Other) with plain-English explanations and Investopedia "Learn more" links.
+## SHIPPED: [P0] Add Educational Tooltips to Finance Dashboard
+**Deployed:** 2026-01-05 03:08
+**Verified:** Production check passed
 
 ## QA_PASSED: [P1] Implement Real-Time SSE Updates for Finance Data @dev-alpha
 - **Priority**: P1
 - **Files**: dashboard/src/lib/stores/finance.ts, dashboard/src/routes/api/finance/stream/+server.ts, dashboard/src/lib/components/finance/NetWorthCard.svelte
 - **Summary**: SSE store with auto-reconnect, 5s update interval, heartbeat. Number scroll animation (800ms easeOutQuart). "Live" badge with pulse animation. Build verified.
 
-## QA_PASSED: [P0] Build Mock Data Service @dev-beta
-- **Priority**: P0
-- **Assigned**: @dev-beta
-- **Files**: dashboard/src/lib/services/mockFinanceData.ts
-- **Summary:** Created service with realistic mock data (net worth with 30-day history, 5 asset classes). Implements pub/sub pattern, manual refresh, auto-refresh toggle (30s default), and utility formatters. TypeScript compilation verified.
+## SHIPPED: [P0] Build Mock Data Service
+**Deployed:** 2026-01-05 03:08
+**Verified:** Production check passed
 
 ## QA_PASSED: [P1] Privacy Indicator Component @tech-lead
 - **Priority**: P1
