@@ -42,24 +42,24 @@ Add these to items when creating them:
 ## Ready for Work
 <!-- Devs: claim these by adding @your-name and changing to IN_PROGRESS -->
 
-## DONE: Add Educational Tooltips to Finance Dashboard @dev-gamma
+## QA_PASSED: [P0] Add Educational Tooltips to Finance Dashboard @dev-gamma
 - **Priority**: P0
 - **Assigned**: @dev-gamma
 - **Files**: dashboard/src/routes/finance/+page.svelte, dashboard/src/lib/components/finance/*.svelte, dashboard/src/lib/components/Tooltip.svelte
 - **Summary**: Created finance dashboard page with NetWorthCard and AssetAllocationChart components. Integrated Tooltip component with hover/tap interactions. Added tooltips for "Net Worth", "Asset Allocation", and 5 asset classes (Stocks, Real Estate, Cash, Crypto, Other) with plain-English explanations and Investopedia "Learn more" links.
 
-## IN_PROGRESS: Implement Real-Time SSE Updates for Finance Data @dev-alpha
+## QA_PASSED: [P1] Implement Real-Time SSE Updates for Finance Data @dev-alpha
 - **Priority**: P1
-- **Files**: dashboard/src/routes/finance/+page.svelte, dashboard/src/lib/stores/finance.ts
-- **Summary**: Create finance store that subscribes to SSE events for live net worth and asset allocation updates. Add number scroll animation when values change. Show "Live" indicator when connected.
+- **Files**: dashboard/src/lib/stores/finance.ts, dashboard/src/routes/api/finance/stream/+server.ts, dashboard/src/lib/components/finance/NetWorthCard.svelte
+- **Summary**: SSE store with auto-reconnect, 5s update interval, heartbeat. Number scroll animation (800ms easeOutQuart). "Live" badge with pulse animation. Build verified.
 
-## DONE: Build Mock Data Service @dev-beta
+## QA_PASSED: [P0] Build Mock Data Service @dev-beta
 - **Priority**: P0
 - **Assigned**: @dev-beta
 - **Files**: dashboard/src/lib/services/mockFinanceData.ts
 - **Summary:** Created service with realistic mock data (net worth with 30-day history, 5 asset classes). Implements pub/sub pattern, manual refresh, auto-refresh toggle (30s default), and utility formatters. TypeScript compilation verified.
 
-## DONE: Privacy Indicator Component @tech-lead
+## QA_PASSED: [P1] Privacy Indicator Component @tech-lead
 - **Priority**: P1
 - **Files**: dashboard/src/lib/components/finance/PrivacyIndicator.svelte
 - **Summary**: Lock/cloud icon with Local/Cloud modes. Transparency panel shows data storage/sharing. CSV/JSON export. Mobile-responsive fixed panel.
@@ -88,11 +88,9 @@ Add these to items when creating them:
 
 ---
 
-## QA_PASSED: [P0] Dashboard Skeleton + Mock Data Components @qa
-**Files**: dashboard/src/routes/finance/+page.svelte, dashboard/src/lib/components/finance/NetWorthCard.svelte
-- **Priority**: P0
-- **Summary**: Finance dashboard page with responsive layout and NetWorthCard component displaying animated net worth values with change indicators
-- **Tested**: ✅ Build passes successfully, components render properly, basic functionality verified
+## SHIPPED: [P0] Dashboard Skeleton + Mock Data Components
+**Deployed:** 2026-01-05 03:00
+**Verified:** Production check passed
 
 ## QA Passed (Ready for Deploy)
 <!-- Verified working, ready for deployment (unless Review Required) -->
