@@ -310,12 +310,10 @@ main() {
 
             PROMPT=$(build_prompt)
 
-            # Spawn fresh Claude session for this ONE task
-            # Using --dangerously-skip-permissions for autonomous operation
-            # Session ends when agent completes task and stops responding
-            # Model selection: haiku for QA/DevOps, sonnet for devs
-            # Note: haiku supports vision for Playwright screenshot verification
-            claude -p "$PROMPT" --dangerously-skip-permissions --model "$AGENT_MODEL"
+            # Spawn fresh Z.ai/GLM session for this ONE task
+            # Using cc-mirror's zai wrapper (GLM-4.7 for sonnet/opus, GLM-4.5-Air for haiku)
+            # --dangerously-skip-permissions for autonomous operation
+            zai -p "$PROMPT" --dangerously-skip-permissions --model "$AGENT_MODEL"
 
             EXIT_CODE=$?
             log "Session ended (exit: $EXIT_CODE)"
