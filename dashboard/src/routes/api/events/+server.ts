@@ -7,21 +7,33 @@ import { broadcast, broadcastDataRefresh } from '$lib/server/event-bus';
  *
  * Receives events from agency via emit-event.sh
  * Broadcasts to all SSE clients
- *
- * Event types that trigger data refresh:
- * - task_complete, task_claimed, status_change
- * - file_updated, refresh
+ * Refreshes data on any agent activity (standup/backlog may have changed)
  */
 
-// Events that indicate file state changed - trigger data refresh
-const DATA_CHANGE_EVENTS = new Set([
-	'task_complete',
-	'task_claimed',
-	'status_change',
-	'file_updated',
-	'refresh',
-	'session_ended'
-]);
+// Debounce data refresh to avoid hammering disk
+let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
+let lastRefresh = 0;
+const REFRESH_DEBOUNCE = 500; // ms
+
+async function debouncedRefresh() {
+	const now = Date.now();
+
+	// If we just refreshed, skip
+	if (now - lastRefresh < REFRESH_DEBOUNCE) {
+		// Schedule a delayed refresh if not already scheduled
+		if (!refreshTimeout) {
+			refreshTimeout = setTimeout(async () => {
+				refreshTimeout = null;
+				lastRefresh = Date.now();
+				await broadcastDataRefresh();
+			}, REFRESH_DEBOUNCE);
+		}
+		return;
+	}
+
+	lastRefresh = now;
+	await broadcastDataRefresh();
+}
 
 export const POST: RequestHandler = async ({ request }) => {
 	try {
@@ -33,12 +45,13 @@ export const POST: RequestHandler = async ({ request }) => {
 		// Add server timestamp
 		event.timestamp = Date.now();
 
-		// Broadcast the event itself
+		// Broadcast the event itself (for real-time activity feed)
 		broadcast(event);
 
-		// If this event indicates data changed, also send fresh data
-		if (DATA_CHANGE_EVENTS.has(eventType)) {
-			await broadcastDataRefresh();
+		// Refresh data on any agent activity - files may have changed
+		// Use debouncing to avoid excessive disk reads during bursts
+		if (event.agent || eventType === 'refresh') {
+			await debouncedRefresh();
 		}
 
 		return json({ ok: true });
