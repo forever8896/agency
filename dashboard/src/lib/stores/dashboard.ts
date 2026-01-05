@@ -1,9 +1,24 @@
 import { writable, derived } from 'svelte/store';
 import type { DashboardState, BacklogState, AgentStatus, Handoff, WSMessage } from '../types';
 
+// Real-time event from bash scripts
+interface RealtimeEvent {
+	type: string;
+	agent?: string;
+	message?: string;
+	task?: string;
+	status?: string;
+	from?: string;
+	to?: string;
+	timestamp?: string;
+	serverTimestamp?: number;
+	data?: DashboardState;
+}
+
 interface StoreState extends DashboardState {
 	connected: boolean;
 	lastUpdate: number;
+	recentEvents: RealtimeEvent[];
 }
 
 function createDashboardStore() {
@@ -12,36 +27,50 @@ function createDashboardStore() {
 		agents: [],
 		handoffs: [],
 		connected: false,
-		lastUpdate: 0
+		lastUpdate: 0,
+		recentEvents: []
 	});
 
-	let ws: WebSocket | null = null;
+	let eventSource: EventSource | null = null;
 	let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
 	function connect() {
 		if (typeof window === 'undefined') return;
 
-		const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-		const wsUrl = `${protocol}//${window.location.host}/ws`;
+		// Use SSE for real-time events (faster than WebSocket for one-way data)
+		const sseUrl = `/api/events/stream`;
 
-		console.log('[Store] Connecting to', wsUrl);
-		ws = new WebSocket(wsUrl);
+		console.log('[Store] Connecting via SSE to', sseUrl);
+		eventSource = new EventSource(sseUrl);
 
-		ws.onopen = () => {
-			console.log('[Store] Connected');
+		eventSource.onopen = () => {
+			console.log('[Store] SSE Connected');
 			update((state) => ({ ...state, connected: true }));
 		};
 
-		ws.onmessage = (event) => {
+		eventSource.onmessage = (event) => {
 			try {
-				const message: WSMessage = JSON.parse(event.data);
-				console.log('[Store] Message:', message.type);
+				const message: RealtimeEvent = JSON.parse(event.data);
+				console.log('[Store] Event:', message.type, message.agent || '');
 
-				if (message.type === 'initial' || message.type === 'update') {
+				// Handle full state updates (initial, file_change, refresh)
+				if (message.type === 'initial' || message.type === 'file_change' || message.type === 'refresh') {
+					if (message.data) {
+						update((state) => ({
+							...state,
+							...message.data,
+							lastUpdate: message.serverTimestamp || Date.now()
+						}));
+					}
+				}
+
+				// Handle real-time events from agents (add to recent events)
+				if (message.agent) {
 					update((state) => ({
 						...state,
-						...message.data,
-						lastUpdate: message.timestamp || Date.now()
+						lastUpdate: message.serverTimestamp || Date.now(),
+						// Keep last 20 events
+						recentEvents: [message, ...state.recentEvents].slice(0, 20)
 					}));
 				}
 			} catch (e) {
@@ -49,28 +78,39 @@ function createDashboardStore() {
 			}
 		};
 
-		ws.onclose = () => {
-			console.log('[Store] Disconnected');
+		eventSource.onerror = (error) => {
+			console.error('[Store] SSE Error:', error);
 			update((state) => ({ ...state, connected: false }));
-			// Auto-reconnect after 3 seconds
-			reconnectTimer = setTimeout(connect, 3000);
-		};
 
-		ws.onerror = (error) => {
-			console.error('[Store] Error:', error);
+			// Close and reconnect
+			eventSource?.close();
+			eventSource = null;
+
+			// Auto-reconnect after 2 seconds
+			reconnectTimer = setTimeout(connect, 2000);
 		};
 	}
 
 	function disconnect() {
 		if (reconnectTimer) clearTimeout(reconnectTimer);
-		ws?.close();
-		ws = null;
+		eventSource?.close();
+		eventSource = null;
+	}
+
+	// Manually trigger a refresh from the server
+	async function refresh() {
+		try {
+			await fetch('/api/refresh', { method: 'POST' });
+		} catch (e) {
+			console.error('[Store] Refresh error:', e);
+		}
 	}
 
 	return {
 		subscribe,
 		connect,
-		disconnect
+		disconnect,
+		refresh
 	};
 }
 
@@ -82,3 +122,4 @@ export const agentsStore = derived(dashboardStore, ($d) => $d.agents);
 export const handoffsStore = derived(dashboardStore, ($d) => $d.handoffs);
 export const connectionStore = derived(dashboardStore, ($d) => $d.connected);
 export const lastUpdateStore = derived(dashboardStore, ($d) => $d.lastUpdate);
+export const recentEventsStore = derived(dashboardStore, ($d) => $d.recentEvents);

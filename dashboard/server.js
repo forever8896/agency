@@ -11,6 +11,76 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = process.env.AGENCY_DATA_DIR || path.resolve(__dirname, '../agency/data');
 const PORT = process.env.PORT || 3000;
 
+// ============================================================================
+// SSE (Server-Sent Events) - For real-time push from bash scripts
+// Much faster than file watching: bash POSTs event → instant broadcast to UI
+// ============================================================================
+
+const sseClients = new Set();
+
+function broadcastSSE(event) {
+	const data = `data: ${JSON.stringify(event)}\n\n`;
+	for (const client of sseClients) {
+		client.write(data);
+	}
+}
+
+// Handle incoming events from bash scripts
+function handleEventPost(req, res) {
+	let body = '';
+	req.on('data', chunk => body += chunk);
+	req.on('end', () => {
+		try {
+			const event = JSON.parse(body);
+			console.log(`[Event] ${event.type}: ${event.agent || ''} ${event.task || ''}`);
+
+			// Add server timestamp
+			event.serverTimestamp = Date.now();
+
+			// Broadcast to all SSE clients immediately (sub-10ms)
+			broadcastSSE(event);
+
+			// Also broadcast via WebSocket for backwards compatibility
+			broadcast(currentState);
+
+			res.writeHead(200, { 'Content-Type': 'application/json' });
+			res.end(JSON.stringify({ ok: true }));
+		} catch (e) {
+			console.error('[Event] Parse error:', e);
+			res.writeHead(400, { 'Content-Type': 'application/json' });
+			res.end(JSON.stringify({ error: 'Invalid JSON' }));
+		}
+	});
+}
+
+// SSE stream endpoint - browsers connect here for real-time updates
+function handleSSEStream(req, res) {
+	console.log('[SSE] Client connected');
+
+	res.writeHead(200, {
+		'Content-Type': 'text/event-stream',
+		'Cache-Control': 'no-cache',
+		'Connection': 'keep-alive',
+		'Access-Control-Allow-Origin': '*'
+	});
+
+	// Send initial state
+	res.write(`data: ${JSON.stringify({ type: 'initial', data: currentState, timestamp: Date.now() })}\n\n`);
+
+	// Keep connection alive with heartbeat
+	const heartbeat = setInterval(() => {
+		res.write(`: heartbeat\n\n`);
+	}, 30000);
+
+	sseClients.add(res);
+
+	req.on('close', () => {
+		console.log('[SSE] Client disconnected');
+		clearInterval(heartbeat);
+		sseClients.delete(res);
+	});
+}
+
 // Parser functions
 async function parseBacklog(filePath) {
 	const columns = {};
@@ -154,8 +224,31 @@ async function parseAll() {
 	}
 }
 
-// Create HTTP server
+// Create HTTP server with API routing
 const server = createServer((req, res) => {
+	const url = new URL(req.url, `http://${req.headers.host}`);
+
+	// API Routes for real-time events
+	if (url.pathname === '/api/events' && req.method === 'POST') {
+		return handleEventPost(req, res);
+	}
+
+	if (url.pathname === '/api/events/stream' && req.method === 'GET') {
+		return handleSSEStream(req, res);
+	}
+
+	// Trigger a manual refresh (useful for testing)
+	if (url.pathname === '/api/refresh' && req.method === 'POST') {
+		parseAll().then(() => {
+			broadcast(currentState);
+			broadcastSSE({ type: 'refresh', data: currentState, timestamp: Date.now() });
+			res.writeHead(200, { 'Content-Type': 'application/json' });
+			res.end(JSON.stringify({ ok: true }));
+		});
+		return;
+	}
+
+	// SvelteKit handler for everything else
 	handler(req, res, () => {
 		res.writeHead(404).end('Not Found');
 	});
@@ -201,7 +294,9 @@ chokidar.watch(watchPaths, {
 	debounceTimer = setTimeout(async () => {
 		console.log(`[Watcher] ${event}: ${path.basename(filePath)}`);
 		await parseAll();
+		// Broadcast via both WebSocket and SSE
 		broadcast(currentState);
+		broadcastSSE({ type: 'file_change', data: currentState, timestamp: Date.now() });
 	}, 200);
 });
 

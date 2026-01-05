@@ -19,6 +19,9 @@ set -e
 # Agency files location (can be your Obsidian vault)
 AGENCY_DIR="${AGENCY_DIR:-$(dirname "$(realpath "$0")")}"
 
+# Source event emitter for real-time dashboard updates
+source "$AGENCY_DIR/emit-event.sh" 2>/dev/null || true
+
 # Runtime data directory (gitignored, contains actual work state)
 DATA_DIR="${DATA_DIR:-$AGENCY_DIR/agency/data}"
 
@@ -298,10 +301,12 @@ When done (or no actionable work), stop immediately.
 
 main() {
     log "Starting (DATA_DIR=$DATA_DIR, PROJECTS_DIR=$PROJECTS_DIR, MODEL=$AGENT_MODEL)"
+    emit_started "$AGENT_NAME" 2>/dev/null || true
 
     while true; do
         if has_work; then
             log "${GREEN}Work found - spawning $AGENT_MODEL session...${NC}"
+            emit_work_found "$AGENT_NAME" "Found work, spawning $AGENT_MODEL session" 2>/dev/null || true
 
             PROMPT=$(build_prompt)
 
@@ -314,6 +319,7 @@ main() {
 
             EXIT_CODE=$?
             log "Session ended (exit: $EXIT_CODE)"
+            emit "session_ended" "$AGENT_NAME" "Session completed (exit: $EXIT_CODE)" 2>/dev/null || true
 
             # Brief pause before checking for more work
             sleep 5
@@ -324,6 +330,6 @@ main() {
     done
 }
 
-trap 'echo ""; log "Shutting down..."; exit 0' INT TERM
+trap 'echo ""; log "Shutting down..."; emit_stopped "$AGENT_NAME" 2>/dev/null || true; exit 0' INT TERM
 
 main

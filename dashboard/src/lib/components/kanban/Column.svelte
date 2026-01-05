@@ -7,36 +7,32 @@
 	export let status: TaskStatus;
 	export let tasks: Task[] = [];
 
-	$: config = COLUMN_CONFIG[status] || { color: '#6b7280', bgColor: '#f3f4f6', icon: '📋' };
+	$: config = COLUMN_CONFIG[status] || { color: '#000', bgColor: '#fff', icon: '' };
 	$: displayName = status.replace(/_/g, ' ');
 </script>
 
-<div class="flex flex-col w-80 min-w-80 flex-shrink-0 h-full max-h-[calc(100vh-140px)]">
-	<div
-		class="flex items-center gap-3 px-4 py-3 rounded-t-xl backdrop-blur-md border-x border-t border-white/10"
-		style="background: linear-gradient(to bottom, {config.bgColor}40, {config.bgColor}10)"
-	>
-		<span class="text-xl filter drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">{config.icon}</span>
-		<h3 class="text-sm font-bold uppercase tracking-widest text-white/90 shadow-black drop-shadow-md">
-			{displayName}
-		</h3>
-		<span
-			class="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full border border-white/20 shadow-inner"
-			style="background-color: {config.color}80; color: white"
-		>
+<div class="flex flex-col w-80 min-w-80 flex-shrink-0 h-full max-h-full">
+    <!-- Header -->
+	<div class="flex items-center justify-between px-4 py-3 border-2 border-black bg-white mb-2 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+        <div class="flex items-center gap-2">
+            <h3 class="text-sm font-black uppercase tracking-tight text-black">
+                {displayName}
+            </h3>
+        </div>
+		<span class="font-mono text-xs font-bold bg-black text-white px-2 py-0.5">
 			{tasks.length}
 		</span>
 	</div>
 
-	<div class="glass-panel rounded-b-xl border-t-0 p-3 space-y-3 overflow-y-auto flex-1 custom-scrollbar bg-slate-900/20">
+    <!-- Drop Zone / List -->
+	<div class="border-2 border-black bg-[#f8f8f8] p-2 overflow-y-auto flex-1 custom-scrollbar">
 		{#each tasks as task (task.id)}
-            <div animate:flip={{ duration: 300 }}>
+            <div animate:flip={{ duration: 200 }}>
 			    <Card {task} />
             </div>
 		{:else}
-			<div class="flex flex-col items-center justify-center h-32 text-slate-500/50">
-                <span class="text-3xl mb-2 opacity-20">∅</span>
-				<span class="text-xs uppercase tracking-widest opacity-40">Empty Sector</span>
+			<div class="flex flex-col items-center justify-center h-24 opacity-40">
+                <div class="w-8 h-8 border-2 border-dashed border-black rounded-full mb-2"></div>
 			</div>
 		{/each}
 	</div>

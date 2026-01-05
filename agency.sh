@@ -85,6 +85,9 @@ mkdir -p "$DATA_DIR/handoffs"
 mkdir -p "$DATA_DIR/projects"
 mkdir -p "$DATA_DIR/knowledge"
 
+# Source event emitter for real-time dashboard updates
+source "$AGENCY_DIR/emit-event.sh" 2>/dev/null || true
+
 # Initialize data files from templates if they don't exist
 init_data() {
     local files=("inbox.md" "backlog.md" "board.md" "standup.md" "metrics.md")
@@ -202,6 +205,7 @@ start_agent() {
     nohup "$AGENCY_DIR/run-agent.sh" "$agent" > /dev/null 2>&1 &
     echo $! > "$pid_file"
     echo -e "${GREEN}[$agent]${NC} Started (PID: $!)"
+    emit "agent_spawned" "$agent" "Process started (PID: $!)" 2>/dev/null || true
 }
 
 stop_agent() {
@@ -215,6 +219,7 @@ stop_agent() {
             kill "$pid" 2>/dev/null || true
             rm -f "$pid_file"
             echo -e "${RED}[$agent]${NC} Stopped"
+            emit "agent_killed" "$agent" "Process stopped" 2>/dev/null || true
         else
             echo -e "${YELLOW}[$agent]${NC} Not running (stale PID file removed)"
             rm -f "$pid_file"
@@ -245,11 +250,13 @@ start_all() {
     banner
     echo -e "${BOLD}Starting squad...${NC}"
     echo ""
+    emit "squad_starting" "system" "Starting all agents" 2>/dev/null || true
     for agent in "${AGENTS[@]}"; do
         start_agent "$agent"
     done
     echo ""
     echo -e "${GREEN}Squad is now operational.${NC}"
+    emit "squad_started" "system" "All agents running" 2>/dev/null || true
     echo ""
     echo -e "Add requests to:    ${CYAN}$DATA_DIR/inbox.md${NC}"
     echo -e "Watch backlog:      ${CYAN}$DATA_DIR/backlog.md${NC}"
@@ -263,11 +270,13 @@ start_all() {
 stop_all() {
     echo -e "${BOLD}Stopping squad...${NC}"
     echo ""
+    emit "squad_stopping" "system" "Stopping all agents" 2>/dev/null || true
     for agent in "${AGENTS[@]}"; do
         stop_agent "$agent"
     done
     echo ""
     echo -e "${RED}Squad is now offline.${NC}"
+    emit "squad_stopped" "system" "All agents stopped" 2>/dev/null || true
 }
 
 show_status() {
