@@ -6,10 +6,10 @@ Tracking the four key metrics that DORA research shows correlate with high-perfo
 
 | Metric | Value | Target | Status |
 |--------|-------|--------|--------|
-| Deployment Frequency | -- | Daily | -- |
-| Lead Time for Changes | -- | < 1 day | -- |
-| Change Failure Rate | -- | < 15% | -- |
-| Mean Time to Recovery | -- | < 1 hour | -- |
+| Deployment Frequency | 0 | Daily | No deployments |
+| Lead Time for Changes | -- | < 1 day | No changes |
+| Change Failure Rate | -- | < 15% | No changes |
+| Mean Time to Recovery | -- | < 1 hour | Incidents |
 
 ## Why These Metrics?
 
@@ -55,7 +55,7 @@ Time to restore service after production incident.
 
 | Date | Freq | Lead Time | Failure Rate | MTTR | Notes |
 |------|------|-----------|--------------|------|-------|
-| -- | -- | -- | -- | -- | Initial setup |
+| 2026-01-05 | 2 | < 1 day | 0% | -- | Deployed 2 items: Educational Tooltip System (P0), Finance Research & Discovery (P1) |
 
 ---
 
