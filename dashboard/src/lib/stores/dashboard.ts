@@ -12,6 +12,7 @@ interface RealtimeEvent {
 	to?: string;
 	timestamp?: string;
 	serverTimestamp?: number;
+	hash?: string;
 	data?: DashboardState;
 }
 
@@ -22,6 +23,7 @@ interface StoreState extends DashboardState {
 	connected: boolean;
 	connectionState: ConnectionState;
 	lastUpdate: number;
+	lastHash: string;
 	recentEvents: RealtimeEvent[];
 	retryCount: number;
 }
@@ -42,6 +44,7 @@ function createDashboardStore() {
 		connected: false,
 		connectionState: 'disconnected',
 		lastUpdate: 0,
+		lastHash: '',
 		recentEvents: [],
 		retryCount: 0
 	});
@@ -49,6 +52,7 @@ function createDashboardStore() {
 	let eventSource: EventSource | null = null;
 	let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 	let currentRetryCount = 0;
+	let currentHash = '';
 
 	// Calculate delay with exponential backoff
 	function getReconnectDelay(): number {
@@ -56,8 +60,14 @@ function createDashboardStore() {
 		return Math.min(delay, RECONNECT_CONFIG.maxDelay);
 	}
 
-	async function connect(isRetry = false) {
+	function connect(isRetry = false) {
 		if (typeof window === 'undefined') return;
+
+		// Prevent duplicate connections
+		if (eventSource && eventSource.readyState !== EventSource.CLOSED) {
+			console.log('[Store] Already connected or connecting');
+			return;
+		}
 
 		// Update state to show we're connecting/reconnecting
 		update((state) => ({
@@ -66,26 +76,10 @@ function createDashboardStore() {
 			retryCount: currentRetryCount
 		}));
 
-		// Fetch initial data first
-		try {
-			const res = await fetch('/api/data');
-			if (res.ok) {
-				const data = await res.json();
-				update((state) => ({
-					...state,
-					...data,
-					lastUpdate: Date.now()
-				}));
-				console.log('[Store] Initial data loaded');
-			}
-		} catch (e) {
-			console.error('[Store] Failed to load initial data:', e);
-		}
-
-		// Then connect SSE for real-time updates
+		// SSE provides initial state - no need for separate fetch
 		const sseUrl = `/api/events/stream`;
+		console.log(`[Store] ${isRetry ? 'Reconnecting' : 'Connecting'} via SSE`, isRetry ? `(attempt ${currentRetryCount + 1}/${RECONNECT_CONFIG.maxRetries})` : '');
 
-		console.log(`[Store] ${isRetry ? 'Reconnecting' : 'Connecting'} via SSE to`, sseUrl, isRetry ? `(attempt ${currentRetryCount + 1}/${RECONNECT_CONFIG.maxRetries})` : '');
 		eventSource = new EventSource(sseUrl);
 
 		eventSource.onopen = () => {
@@ -103,15 +97,22 @@ function createDashboardStore() {
 		eventSource.onmessage = (event) => {
 			try {
 				const message: RealtimeEvent = JSON.parse(event.data);
-				console.log('[Store] Event:', message.type, message.agent || '');
 
 				// Handle full state updates (initial, file_change, refresh)
 				if (message.type === 'initial' || message.type === 'file_change' || message.type === 'refresh') {
+					// Skip if hash unchanged (deduplication)
+					if (message.hash && message.hash === currentHash) {
+						return;
+					}
+
 					if (message.data) {
+						currentHash = message.hash || '';
+						console.log('[Store] State update:', message.type, message.hash ? `(hash: ${message.hash})` : '');
 						update((state) => ({
 							...state,
 							...message.data,
-							lastUpdate: message.serverTimestamp || Date.now()
+							lastUpdate: message.serverTimestamp || Date.now(),
+							lastHash: currentHash
 						}));
 					}
 				}

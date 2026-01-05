@@ -16,16 +16,22 @@ export const GET: RequestHandler = async () => {
 				}
 			};
 
-			// Send initial state
+			// Send initial state with hash for client-side deduplication
 			send({
 				type: 'initial',
 				data: fileWatcher.getState(),
+				hash: fileWatcher.getHash(),
 				timestamp: Date.now()
 			});
 
-			// Subscribe to file changes
-			const unsubFile = fileWatcher.subscribe((state) => {
-				send({ type: 'file_change', data: state, timestamp: Date.now() });
+			// Subscribe to FUTURE file changes only (not immediate)
+			const unsubFile = fileWatcher.subscribe((state, hash) => {
+				send({
+					type: 'file_change',
+					data: state,
+					hash,
+					timestamp: Date.now()
+				});
 			});
 
 			// Subscribe to real-time events from agents
