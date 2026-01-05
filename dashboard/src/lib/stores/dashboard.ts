@@ -15,11 +15,24 @@ interface RealtimeEvent {
 	data?: DashboardState;
 }
 
+// Connection state for better UI feedback
+export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'failed';
+
 interface StoreState extends DashboardState {
 	connected: boolean;
+	connectionState: ConnectionState;
 	lastUpdate: number;
 	recentEvents: RealtimeEvent[];
+	retryCount: number;
 }
+
+// Reconnection configuration
+const RECONNECT_CONFIG = {
+	baseDelay: 2000,        // Start with 2 seconds
+	maxDelay: 60000,        // Cap at 60 seconds
+	maxRetries: 10,         // Give up after 10 attempts
+	backoffMultiplier: 1.5  // Multiply delay by 1.5 each retry
+};
 
 function createDashboardStore() {
 	const { subscribe, set, update } = writable<StoreState>({
@@ -27,15 +40,31 @@ function createDashboardStore() {
 		agents: [],
 		handoffs: [],
 		connected: false,
+		connectionState: 'disconnected',
 		lastUpdate: 0,
-		recentEvents: []
+		recentEvents: [],
+		retryCount: 0
 	});
 
 	let eventSource: EventSource | null = null;
 	let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+	let currentRetryCount = 0;
 
-	async function connect() {
+	// Calculate delay with exponential backoff
+	function getReconnectDelay(): number {
+		const delay = RECONNECT_CONFIG.baseDelay * Math.pow(RECONNECT_CONFIG.backoffMultiplier, currentRetryCount);
+		return Math.min(delay, RECONNECT_CONFIG.maxDelay);
+	}
+
+	async function connect(isRetry = false) {
 		if (typeof window === 'undefined') return;
+
+		// Update state to show we're connecting/reconnecting
+		update((state) => ({
+			...state,
+			connectionState: isRetry ? 'reconnecting' : 'connecting',
+			retryCount: currentRetryCount
+		}));
 
 		// Fetch initial data first
 		try {
@@ -56,12 +85,19 @@ function createDashboardStore() {
 		// Then connect SSE for real-time updates
 		const sseUrl = `/api/events/stream`;
 
-		console.log('[Store] Connecting via SSE to', sseUrl);
+		console.log(`[Store] ${isRetry ? 'Reconnecting' : 'Connecting'} via SSE to`, sseUrl, isRetry ? `(attempt ${currentRetryCount + 1}/${RECONNECT_CONFIG.maxRetries})` : '');
 		eventSource = new EventSource(sseUrl);
 
 		eventSource.onopen = () => {
 			console.log('[Store] SSE Connected');
-			update((state) => ({ ...state, connected: true }));
+			// Reset retry count on successful connection
+			currentRetryCount = 0;
+			update((state) => ({
+				...state,
+				connected: true,
+				connectionState: 'connected',
+				retryCount: 0
+			}));
 		};
 
 		eventSource.onmessage = (event) => {
@@ -96,14 +132,38 @@ function createDashboardStore() {
 
 		eventSource.onerror = (error) => {
 			console.error('[Store] SSE Error:', error);
-			update((state) => ({ ...state, connected: false }));
 
-			// Close and reconnect
+			// Close existing connection
 			eventSource?.close();
 			eventSource = null;
 
-			// Auto-reconnect after 2 seconds
-			reconnectTimer = setTimeout(connect, 2000);
+			// Check if we've exceeded max retries (circuit breaker)
+			if (currentRetryCount >= RECONNECT_CONFIG.maxRetries) {
+				console.error(`[Store] Max retries (${RECONNECT_CONFIG.maxRetries}) exceeded. Giving up. Call reconnect() to try again.`);
+				update((state) => ({
+					...state,
+					connected: false,
+					connectionState: 'failed',
+					retryCount: currentRetryCount
+				}));
+				return; // Stop trying - circuit breaker open
+			}
+
+			// Calculate delay with exponential backoff
+			const delay = getReconnectDelay();
+			currentRetryCount++;
+
+			console.log(`[Store] Will reconnect in ${Math.round(delay / 1000)}s (attempt ${currentRetryCount}/${RECONNECT_CONFIG.maxRetries})`);
+
+			update((state) => ({
+				...state,
+				connected: false,
+				connectionState: 'reconnecting',
+				retryCount: currentRetryCount
+			}));
+
+			// Schedule reconnection with backoff
+			reconnectTimer = setTimeout(() => connect(true), delay);
 		};
 	}
 
@@ -111,6 +171,20 @@ function createDashboardStore() {
 		if (reconnectTimer) clearTimeout(reconnectTimer);
 		eventSource?.close();
 		eventSource = null;
+		currentRetryCount = 0;
+		update((state) => ({
+			...state,
+			connected: false,
+			connectionState: 'disconnected',
+			retryCount: 0
+		}));
+	}
+
+	// Manual reconnect - resets circuit breaker and tries again
+	function reconnect() {
+		console.log('[Store] Manual reconnect requested - resetting circuit breaker');
+		disconnect();
+		connect(false);
 	}
 
 	// Manually trigger a refresh from the server
@@ -126,6 +200,7 @@ function createDashboardStore() {
 		subscribe,
 		connect,
 		disconnect,
+		reconnect,
 		refresh
 	};
 }
@@ -137,5 +212,7 @@ export const backlogStore = derived(dashboardStore, ($d) => $d.backlog);
 export const agentsStore = derived(dashboardStore, ($d) => $d.agents);
 export const handoffsStore = derived(dashboardStore, ($d) => $d.handoffs);
 export const connectionStore = derived(dashboardStore, ($d) => $d.connected);
+export const connectionStateStore = derived(dashboardStore, ($d) => $d.connectionState);
+export const retryCountStore = derived(dashboardStore, ($d) => $d.retryCount);
 export const lastUpdateStore = derived(dashboardStore, ($d) => $d.lastUpdate);
 export const recentEventsStore = derived(dashboardStore, ($d) => $d.recentEvents);

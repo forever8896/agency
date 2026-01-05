@@ -3,13 +3,38 @@ import { handler } from './build/handler.js';
 import { WebSocketServer, WebSocket } from 'ws';
 import chokidar from 'chokidar';
 import { readFile, readdir } from 'fs/promises';
-import { existsSync } from 'fs';
+import { existsSync, mkdirSync, copyFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = process.env.AGENCY_DATA_DIR || path.resolve(__dirname, '../agency/data');
+const AGENCY_DIR = path.resolve(__dirname, '..');
 const PORT = process.env.PORT || 3000;
+
+// Initialize data directory from templates if it doesn't exist
+// Mirrors the init_data() function in agency.sh
+function initDataDir() {
+	if (!existsSync(DATA_DIR)) {
+		console.log(`[Server] Creating data directory: ${DATA_DIR}`);
+		mkdirSync(DATA_DIR, { recursive: true });
+		mkdirSync(path.join(DATA_DIR, 'handoffs'), { recursive: true });
+	}
+
+	const templates = ['inbox.md', 'backlog.md', 'board.md', 'standup.md', 'metrics.md'];
+	for (const file of templates) {
+		const dataFile = path.join(DATA_DIR, file);
+		const templateFile = path.join(AGENCY_DIR, file);
+
+		if (!existsSync(dataFile) && existsSync(templateFile)) {
+			console.log(`[Server] Initializing ${file} from template`);
+			copyFileSync(templateFile, dataFile);
+		}
+	}
+}
+
+// Initialize on startup
+initDataDir();
 
 // ============================================================================
 // SSE (Server-Sent Events) - For real-time push from bash scripts

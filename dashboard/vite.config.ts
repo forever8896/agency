@@ -116,11 +116,38 @@ async function parseHandoffs(dirPath: string) {
 	return handoffs;
 }
 
+// Initialize data directory from templates if it doesn't exist
+// Mirrors the init_data() function in agency.sh
+function initDataDir(dataDir: string, agencyDir: string) {
+	if (!existsSync(dataDir)) {
+		console.log(`[Vite] Creating data directory: ${dataDir}`);
+		const fs = require('fs');
+		fs.mkdirSync(dataDir, { recursive: true });
+		fs.mkdirSync(path.join(dataDir, 'handoffs'), { recursive: true });
+	}
+
+	const templates = ['inbox.md', 'backlog.md', 'board.md', 'standup.md', 'metrics.md'];
+	for (const file of templates) {
+		const dataFile = path.join(dataDir, file);
+		const templateFile = path.join(agencyDir, file);
+
+		if (!existsSync(dataFile) && existsSync(templateFile)) {
+			console.log(`[Vite] Initializing ${file} from template`);
+			const fs = require('fs');
+			fs.copyFileSync(templateFile, dataFile);
+		}
+	}
+}
+
 // WebSocket plugin for dev mode
 function webSocketPlugin() {
 	let wss: WebSocketServer | null = null;
 	let currentState = { backlog: { columns: {} }, agents: [] as any[], handoffs: [] as any[] };
 	const DATA_DIR = path.resolve(process.cwd(), '../agency/data');
+	const AGENCY_DIR = path.resolve(process.cwd(), '..');
+
+	// Initialize data directory on plugin load
+	initDataDir(DATA_DIR, AGENCY_DIR);
 
 	async function parseAll() {
 		const [backlog, agents, handoffs] = await Promise.all([

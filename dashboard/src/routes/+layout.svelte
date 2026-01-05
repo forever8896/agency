@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { onMount, onDestroy } from 'svelte';
-	import { dashboardStore, connectionStore, lastUpdateStore } from '$lib/stores/dashboard';
+	import { dashboardStore, connectionStateStore, retryCountStore, lastUpdateStore, type ConnectionState } from '$lib/stores/dashboard';
 
 	onMount(() => {
 		dashboardStore.connect();
@@ -15,6 +15,17 @@
 		if (!timestamp) return '--:--:--';
 		return new Date(timestamp).toLocaleTimeString('en-US', { hour12: false });
 	}
+
+	// Map connection state to display properties
+	const stateConfig: Record<ConnectionState, { label: string; color: string; showRetry: boolean }> = {
+		disconnected: { label: 'OFFLINE', color: 'text-gray-500', showRetry: false },
+		connecting: { label: 'CONNECTING...', color: 'text-yellow-600', showRetry: false },
+		connected: { label: 'CONNECTED', color: 'text-green-600', showRetry: false },
+		reconnecting: { label: 'RECONNECTING', color: 'text-orange-500', showRetry: false },
+		failed: { label: 'FAILED', color: 'text-red-600', showRetry: true }
+	};
+
+	$: currentState = stateConfig[$connectionStateStore] || stateConfig.disconnected;
 </script>
 
 <div class="min-h-screen flex flex-col">
@@ -31,9 +42,20 @@
             <!-- Connection status -->
             <div class="flex items-center gap-3 border-2 border-black px-3 py-1 bg-gray-100 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
                 <span class="font-bold uppercase">Status:</span>
-                <span class="font-bold" class:text-green-600={$connectionStore} class:text-red-600={!$connectionStore}>
-                    {$connectionStore ? 'CONNECTED' : 'DISCONNECTED'}
+                <span class="font-bold {currentState.color}">
+                    {currentState.label}
+                    {#if $connectionStateStore === 'reconnecting'}
+                        <span class="text-xs">({$retryCountStore}/10)</span>
+                    {/if}
                 </span>
+                {#if currentState.showRetry}
+                    <button
+                        on:click={() => dashboardStore.reconnect()}
+                        class="ml-2 px-2 py-0.5 bg-black text-white text-xs font-bold hover:bg-gray-800 transition-colors"
+                    >
+                        RETRY
+                    </button>
+                {/if}
             </div>
 
             <!-- Last update -->

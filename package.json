@@ -1,0 +1,20 @@
+{
+  "name": "autonomous_opencode_builder",
+  "version": "1.0.0",
+  "description": "An autonomous multi-agent development team powered by Claude Code - with quality gates to ensure nothing ships broken.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/forever8896/agency.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/forever8896/agency/issues"
+  },
+  "homepage": "https://github.com/forever8896/agency#readme"
+}

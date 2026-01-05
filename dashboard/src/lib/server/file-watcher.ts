@@ -1,10 +1,37 @@
 import chokidar from 'chokidar';
 import path from 'path';
+import { existsSync, mkdirSync, copyFileSync } from 'fs';
 import { parseBacklog, parseStandup, parseHandoffs } from './parser';
 import type { DashboardState } from '../types';
 
 // Get data directory from environment or use default
 const DATA_DIR = process.env.AGENCY_DATA_DIR || path.resolve(process.cwd(), '../agency/data');
+const AGENCY_DIR = path.resolve(process.cwd(), '..');
+
+// Initialize data directory from templates if it doesn't exist
+// Mirrors the init_data() function in agency.sh
+function initDataDir() {
+	if (!existsSync(DATA_DIR)) {
+		console.log(`[FileWatcher] Creating data directory: ${DATA_DIR}`);
+		mkdirSync(DATA_DIR, { recursive: true });
+		mkdirSync(path.join(DATA_DIR, 'handoffs'), { recursive: true });
+	}
+
+	// Copy templates if runtime files don't exist
+	const templates = ['inbox.md', 'backlog.md', 'board.md', 'standup.md', 'metrics.md'];
+	for (const file of templates) {
+		const dataFile = path.join(DATA_DIR, file);
+		const templateFile = path.join(AGENCY_DIR, file);
+
+		if (!existsSync(dataFile) && existsSync(templateFile)) {
+			console.log(`[FileWatcher] Initializing ${file} from template`);
+			copyFileSync(templateFile, dataFile);
+		}
+	}
+}
+
+// Initialize on module load
+initDataDir();
 
 type ChangeCallback = (state: DashboardState) => void;
 

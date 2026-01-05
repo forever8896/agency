@@ -1,9 +1,18 @@
 # Runtime state - all session data in one place
 agency/data/
 .pids/
+handoffs/
 
 # Dependencies
 node_modules/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
 
 # OS files
 .DS_Store
@@ -25,3 +34,6 @@ Thumbs.db
 # SvelteKit build outputs
 .svelte-kit/
 build/
+
+# Vite temp files
+*.timestamp-*.mjs
