@@ -55,7 +55,7 @@ Time to restore service after production incident.
 
 | Date | Freq | Lead Time | Failure Rate | MTTR | Notes |
 |------|------|-----------|--------------|------|-------|
-| -- | -- | -- | -- | -- | Initial setup |
+| 2026-01-05 | 3 | ~7 days | 0% | -- | Deploy event-driven dashboard, crypto tracker |
 
 ---
 
