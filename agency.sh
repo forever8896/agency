@@ -99,6 +99,65 @@ init_data() {
 # Ensure data is initialized
 init_data
 
+# ============================================================================
+# TOKEN OPTIMIZATION: Auto-archive shipped items to prevent backlog bloat
+# ============================================================================
+
+archive_shipped() {
+    local backlog="$DATA_DIR/backlog.md"
+    local archive="$DATA_DIR/archive.md"
+
+    [[ ! -f "$backlog" ]] && return
+
+    # Count shipped items
+    local shipped_count=$(grep -c "## SHIPPED:" "$backlog" 2>/dev/null || echo 0)
+
+    if [[ "$shipped_count" -eq 0 ]]; then
+        echo -e "${YELLOW}No shipped items to archive${NC}"
+        return
+    fi
+
+    # Initialize archive if needed
+    if [[ ! -f "$archive" ]]; then
+        echo "# Archive" > "$archive"
+        echo "" >> "$archive"
+        echo "Completed and shipped work (moved from backlog)." >> "$archive"
+        echo "" >> "$archive"
+        echo "---" >> "$archive"
+        echo "" >> "$archive"
+    fi
+
+    # Extract shipped items (including their content blocks)
+    echo "" >> "$archive"
+    echo "## Archived $(date '+%Y-%m-%d')" >> "$archive"
+    echo "" >> "$archive"
+
+    # Use awk to extract complete SHIPPED blocks (until next ## or ---)
+    awk '/^## SHIPPED:/{p=1} p{print} /^(## [A-Z]|---)/ && !/^## SHIPPED:/{if(p) p=0}' "$backlog" >> "$archive"
+
+    # Remove shipped items from backlog
+    local temp_backlog=$(mktemp)
+    awk '/^## SHIPPED:/{skip=1; next} /^## [A-Z]/{skip=0} !skip' "$backlog" > "$temp_backlog"
+    mv "$temp_backlog" "$backlog"
+
+    echo -e "${GREEN}Archived $shipped_count shipped items to archive.md${NC}"
+}
+
+# Auto-archive if backlog is getting large (>150 lines)
+auto_archive() {
+    local backlog="$DATA_DIR/backlog.md"
+    [[ ! -f "$backlog" ]] && return
+
+    local line_count=$(wc -l < "$backlog")
+    if [[ "$line_count" -gt 150 ]]; then
+        echo -e "${YELLOW}Backlog has $line_count lines - auto-archiving shipped items...${NC}"
+        archive_shipped
+    fi
+}
+
+# Run auto-archive on startup
+auto_archive
+
 banner() {
     echo -e "${BOLD}${CYAN}"
     echo "╔══════════════════════════════════════════════════════════════════════════════╗"
@@ -423,6 +482,10 @@ case "${1:-start}" in
         ;;
     status)
         show_status
+        ;;
+    archive)
+        echo -e "${BOLD}Archiving shipped items...${NC}"
+        archive_shipped
         ;;
     help|--help|-h)
         usage

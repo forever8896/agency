@@ -92,6 +92,41 @@ fi
 AGENT_PROMPT="$AGENT_DIR/AGENT.md"
 COLOR="${AGENT_COLORS[$AGENT_NAME]:-$NC}"
 
+# ============================================================================
+# TOKEN OPTIMIZATION: Smart model selection
+# Use cheaper/faster models for simple verification tasks
+# ============================================================================
+
+# Model selection based on task complexity
+# Override with MODEL env var: MODEL=opus ./run-agent.sh dev-alpha
+get_model_for_agent() {
+    # Allow override
+    if [[ -n "${MODEL:-}" ]]; then
+        echo "$MODEL"
+        return
+    fi
+
+    case "$AGENT_NAME" in
+        # Simple verification tasks - use haiku (fast, cheap)
+        qa|devops)
+            echo "haiku"
+            ;;
+        # Moderate complexity - use sonnet (balanced)
+        product-owner|reviewer)
+            echo "sonnet"
+            ;;
+        # Complex tasks - use sonnet (or opus for critical work)
+        tech-lead|dev-alpha|dev-beta|dev-gamma)
+            echo "sonnet"
+            ;;
+        *)
+            echo "sonnet"
+            ;;
+    esac
+}
+
+AGENT_MODEL=$(get_model_for_agent)
+
 log() {
     echo -e "${COLOR}[$(date '+%H:%M:%S')] [$AGENT_NAME]${NC} $1"
 }
@@ -132,58 +167,150 @@ has_work() {
     esac
 }
 
+# ============================================================================
+# TOKEN OPTIMIZATION: Pre-filter context for each agent type
+# Instead of loading full files, extract only relevant sections
+# ============================================================================
+
+# Extract only relevant backlog items for this agent (saves ~80% tokens)
+get_filtered_backlog() {
+    local backlog="$DATA_DIR/backlog.md"
+    [[ ! -f "$backlog" ]] && return
+
+    case "$AGENT_NAME" in
+        product-owner)
+            # PO needs: header + READY items count only
+            head -30 "$backlog" | grep -E "^(#|## READY:)" 2>/dev/null
+            echo ""
+            echo "<!-- $(grep -c "## READY:" "$backlog" 2>/dev/null || echo 0) items ready -->"
+            ;;
+        tech-lead)
+            # TL needs: READY items + any BLOCKED mentions
+            grep -E "^(## READY:|## IN_PROGRESS:)" "$backlog" 2>/dev/null | head -10
+            ;;
+        dev-alpha|dev-beta|dev-gamma)
+            # Devs need: READY items only (first 5), their own IN_PROGRESS
+            echo "=== Available Work ==="
+            grep -A 5 "## READY:" "$backlog" 2>/dev/null | head -30
+            echo ""
+            echo "=== Your Current Work ==="
+            grep -A 3 "## IN_PROGRESS:.*@$AGENT_NAME" "$backlog" 2>/dev/null
+            ;;
+        qa)
+            # QA needs: DONE items only (compact: just title + Files line)
+            echo "=== Items to Verify ==="
+            grep -A 2 "## DONE:" "$backlog" 2>/dev/null | grep -E "(## DONE:|^\*\*Files:)" | head -20
+            ;;
+        reviewer)
+            # Reviewer needs: QA_PASSED items flagged for review
+            grep -A 3 "## QA_PASSED:.*Review Required: yes" "$backlog" 2>/dev/null | head -20
+            ;;
+        devops)
+            # DevOps needs: QA_PASSED or REVIEWED items
+            grep -E "^## (QA_PASSED|REVIEWED):" "$backlog" 2>/dev/null | head -10
+            ;;
+    esac
+}
+
+# Extract only relevant standup entries (saves ~50% tokens)
+get_filtered_standup() {
+    local standup="$DATA_DIR/standup.md"
+    [[ ! -f "$standup" ]] && return
+
+    case "$AGENT_NAME" in
+        tech-lead)
+            # TL needs: BLOCKED entries only
+            grep -B 2 -A 3 "BLOCKED:" "$standup" 2>/dev/null
+            ;;
+        dev-alpha|dev-beta|dev-gamma)
+            # Devs need: their own section + any relevant blockers
+            awk "/## $AGENT_NAME/,/^## [a-z]/" "$standup" 2>/dev/null | head -10
+            ;;
+        *)
+            # Others: minimal or none
+            echo "<!-- standup context not needed for $AGENT_NAME -->"
+            ;;
+    esac
+}
+
+# Get recent handoffs relevant to this agent (max 2)
+get_relevant_handoffs() {
+    local handoffs_dir="$DATA_DIR/handoffs"
+    [[ ! -d "$handoffs_dir" ]] && return
+
+    case "$AGENT_NAME" in
+        dev-alpha|dev-beta|dev-gamma)
+            # Get handoffs addressed to this dev (newest first, max 2)
+            ls -t "$handoffs_dir"/tl-to-"$AGENT_NAME"-*.md 2>/dev/null | head -2 | while read f; do
+                echo "=== $(basename "$f") ==="
+                head -30 "$f"
+                echo ""
+            done
+            ;;
+        tech-lead)
+            # Get any qa-bug reports (newest first, max 2)
+            ls -t "$handoffs_dir"/qa-bug-*.md 2>/dev/null | head -2 | while read f; do
+                echo "=== $(basename "$f") ==="
+                head -20 "$f"
+                echo ""
+            done
+            ;;
+    esac
+}
+
 # Build minimal prompt - just what the agent needs for THIS task
 # Key insight: Don't load everything, just the relevant context
+# OPTIMIZATION: Pre-filter context to reduce tokens by ~70%
 build_prompt() {
     local prompt
     prompt=$(cat "$AGENT_PROMPT")
 
-    # Add paths and minimal context
+    # Add paths (minimal)
     prompt="$prompt
 
 ## Paths
+- **Data:** $DATA_DIR
+- **Projects:** $PROJECTS_DIR
+- **Time:** $(date '+%Y-%m-%d %H:%M:%S')
 
-- **Agency files:** $AGENCY_DIR
-- **Runtime data:** $DATA_DIR
-- **Code projects:** $PROJECTS_DIR (create new projects here, not in agency folder)
-- Inbox: $DATA_DIR/inbox.md
-- Backlog: $DATA_DIR/backlog.md
-- Standup: $DATA_DIR/standup.md
-- Board: $DATA_DIR/board.md
-- Metrics: $DATA_DIR/metrics.md
-- Handoffs: $DATA_DIR/handoffs/
+## PRE-FILTERED CONTEXT (saves tokens - don't re-read full files)
 
-## Current Time
-$(date '+%Y-%m-%d %H:%M:%S')
+### Backlog (filtered for your role)
+$(get_filtered_backlog)
 
-## CRITICAL: Token Efficiency
+### Standup (filtered)
+$(get_filtered_standup)
 
-You are a STATELESS agent. To minimize token usage:
+### Relevant Handoffs
+$(get_relevant_handoffs)
 
-1. **DO ONE TASK, THEN EXIT** - Don't loop or check for more work
-2. **Read only what you need** - Don't read files 'just to check'
-3. **Write concise updates** - Short standup entries, minimal handoffs
-4. **Exit when done** - After completing your task, simply stop
+## RULES
 
-When you finish your task (or find no actionable work), just stop responding.
-The orchestrator will spawn a fresh instance when new work arrives.
+1. **ONE TASK, THEN EXIT** - Complete one item, update files, stop
+2. **DON'T RE-READ** - Context above is pre-filtered, use it directly
+3. **CONCISE UPDATES** - Max 2-3 sentences in standup/summaries
+4. **EXIT WHEN DONE** - Just stop responding after completing work
+
+When done (or no actionable work), stop immediately.
 "
     echo "$prompt"
 }
 
 main() {
-    log "Starting (DATA_DIR=$DATA_DIR, PROJECTS_DIR=$PROJECTS_DIR)"
+    log "Starting (DATA_DIR=$DATA_DIR, PROJECTS_DIR=$PROJECTS_DIR, MODEL=$AGENT_MODEL)"
 
     while true; do
         if has_work; then
-            log "${GREEN}Work found - spawning fresh Claude session...${NC}"
+            log "${GREEN}Work found - spawning $AGENT_MODEL session...${NC}"
 
             PROMPT=$(build_prompt)
 
             # Spawn fresh Claude session for this ONE task
             # Using --dangerously-skip-permissions for autonomous operation
             # Session ends when agent completes task and stops responding
-            claude -p "$PROMPT" --dangerously-skip-permissions
+            # Model selection: haiku for QA/DevOps, sonnet for devs
+            # Note: haiku supports vision for Playwright screenshot verification
+            claude -p "$PROMPT" --dangerously-skip-permissions --model "$AGENT_MODEL"
 
             EXIT_CODE=$?
             log "Session ended (exit: $EXIT_CODE)"

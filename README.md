@@ -158,10 +158,43 @@ AGENCY_DIR=~/obsidian/Agency ./agency.sh start
 ./agency.sh stop        # Stop all agents
 ./agency.sh status      # Show agent status and DORA metrics
 ./agency.sh watch       # Live activity log (no token usage)
+./agency.sh archive     # Archive shipped items to reduce backlog size
 ./agency.sh <agent>     # Run single agent in foreground (for debugging)
 ```
 
 Available agents: `product-owner`, `tech-lead`, `dev-alpha`, `dev-beta`, `dev-gamma`, `qa`, `reviewer`, `devops`
+
+## Dashboard
+
+A real-time visual dashboard for monitoring the agency.
+
+![Dashboard](dashboard/screenshot.png)
+
+**Features:**
+- Kanban board showing tasks flowing through states
+- Agent avatars with live status indicators (🎯 PO, 🏗️ TL, ⚡ Dev α, etc.)
+- Handoff visualization showing communication flow
+- Real-time updates via WebSocket file watching
+
+**Running the dashboard:**
+
+```bash
+cd dashboard
+
+# Install dependencies
+npm install
+
+# Development mode (with hot reload)
+npm run dev
+
+# Production mode
+npm run build
+npm start
+```
+
+Open http://localhost:3000 to view the dashboard.
+
+The dashboard is read-only - it observes the markdown files but doesn't modify them. Your agency scripts work exactly as before.
 
 ## The Squad
 
