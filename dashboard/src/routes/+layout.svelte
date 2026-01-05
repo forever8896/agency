@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { onMount, onDestroy } from 'svelte';
-	import { dashboardStore, connectionStateStore, retryCountStore, lastUpdateStore, type ConnectionState } from '$lib/stores/dashboard';
+	import { dashboardStore, connectionStateStore, lastUpdateStore, type ConnectionState } from '$lib/stores/dashboard';
 
 	onMount(() => {
 		dashboardStore.connect();
@@ -21,8 +21,8 @@
 		disconnected: { label: 'OFFLINE', color: 'text-gray-500', showRetry: false },
 		connecting: { label: 'CONNECTING...', color: 'text-yellow-600', showRetry: false },
 		connected: { label: 'CONNECTED', color: 'text-green-600', showRetry: false },
-		reconnecting: { label: 'RECONNECTING', color: 'text-orange-500', showRetry: false },
-		failed: { label: 'FAILED', color: 'text-red-600', showRetry: true }
+		reconnecting: { label: 'RECONNECTING...', color: 'text-orange-500', showRetry: false },
+		failed: { label: 'OFFLINE', color: 'text-red-600', showRetry: true }
 	};
 
 	$: currentState = stateConfig[$connectionStateStore] || stateConfig.disconnected;
@@ -42,12 +42,7 @@
             <!-- Connection status -->
             <div class="flex items-center gap-3 border-2 border-black px-3 py-1 bg-gray-100 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
                 <span class="font-bold uppercase">Status:</span>
-                <span class="font-bold {currentState.color}">
-                    {currentState.label}
-                    {#if $connectionStateStore === 'reconnecting'}
-                        <span class="text-xs">({$retryCountStore}/10)</span>
-                    {/if}
-                </span>
+                <span class="font-bold {currentState.color}">{currentState.label}</span>
                 {#if currentState.showRetry}
                     <button
                         on:click={() => dashboardStore.reconnect()}

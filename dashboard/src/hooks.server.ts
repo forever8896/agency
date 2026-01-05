@@ -1,8 +1,9 @@
-import { building } from '$app/environment';
-import { fileWatcher } from '$lib/server/file-watcher';
+// Server hooks
+// No file watching - dashboard uses event-driven architecture
+// Events come from agency via POST /api/events
 
-// Start file watcher when server starts (not during build)
+import { building } from '$app/environment';
+
 if (!building) {
-	fileWatcher.start().catch(console.error);
-	console.log('[Hooks] File watcher started');
+	console.log('[Hooks] Dashboard server ready (event-driven mode)');
 }

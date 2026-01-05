@@ -1,13 +1,13 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { broadcastSSE } from '$lib/server/events';
+import { broadcastDataRefresh } from '$lib/server/event-bus';
 
+/**
+ * Manual Refresh Endpoint
+ *
+ * Triggers a data refresh and broadcasts to all SSE clients
+ */
 export const POST: RequestHandler = async () => {
-	// Broadcast refresh event to all clients
-	broadcastSSE({
-		type: 'refresh',
-		serverTimestamp: Date.now()
-	});
-
+	await broadcastDataRefresh();
 	return json({ ok: true });
 };
