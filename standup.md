@@ -19,10 +19,10 @@ Real-time status from each squad member. Update when you start/finish work.
 ## tech-lead
 **Status:** Idle
 **Working on:** --
-**Completed:** --
+**Completed:** Built PrivacyIndicator component (lock/cloud icon, transparency panel, CSV/JSON export)
 **Blockers:** None
-**Next:** --
-*Updated: --*
+**Next:** Awaiting blockers or design requests
+*Updated: 2026-01-05 02:54*
 
 ---
 
@@ -39,20 +39,20 @@ Real-time status from each squad member. Update when you start/finish work.
 ## dev-beta
 **Status:** Idle
 **Working on:** --
-**Completed:** --
+**Completed:** Mock Finance Data Service (P0)
 **Blockers:** None
 **Next:** --
-*Updated: --*
+*Updated: 2026-01-05 02:55*
 
 ---
 
 ## dev-gamma
 **Status:** Idle
 **Working on:** --
-**Completed:** Checked backlog - no READY items available
+**Completed:** Educational tooltips for finance dashboard
 **Blockers:** None
-**Next:** Waiting for work in backlog
-*Updated: 2025-12-29 18:27*
+**Next:** --
+*Updated: 2026-01-05 02:57*
 
 ---
 

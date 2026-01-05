@@ -34,10 +34,26 @@ function createDashboardStore() {
 	let eventSource: EventSource | null = null;
 	let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
-	function connect() {
+	async function connect() {
 		if (typeof window === 'undefined') return;
 
-		// Use SSE for real-time events (faster than WebSocket for one-way data)
+		// Fetch initial data first
+		try {
+			const res = await fetch('/api/data');
+			if (res.ok) {
+				const data = await res.json();
+				update((state) => ({
+					...state,
+					...data,
+					lastUpdate: Date.now()
+				}));
+				console.log('[Store] Initial data loaded');
+			}
+		} catch (e) {
+			console.error('[Store] Failed to load initial data:', e);
+		}
+
+		// Then connect SSE for real-time updates
 		const sseUrl = `/api/events/stream`;
 
 		console.log('[Store] Connecting via SSE to', sseUrl);

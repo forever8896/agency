@@ -1,0 +1,26 @@
+
+> agency-dashboard@1.0.0 dev
+> vite dev
+
+[Dev WS] Watching /home/deepseek/autonomous_opencode_Builder/agency/data
+node:events:496
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EADDRINUSE: address already in use ::1:3000
+    at Server.setupListenHandle [as _listen2] (node:net:1939:16)
+    at listenInCluster (node:net:1996:12)
+    at GetAddrInfoReqWrap.callback (node:net:2205:7)
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:134:8)
+Emitted 'error' event on WebSocketServer instance at:
+    at Server.emit (node:events:530:35)
+    at emitErrorNT (node:net:1975:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  code: 'EADDRINUSE',
+  errno: -98,
+  syscall: 'listen',
+  address: '::1',
+  port: 3000
+}
+
+Node.js v22.16.0
