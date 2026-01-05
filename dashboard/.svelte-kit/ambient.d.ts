@@ -30,7 +30,6 @@ declare module '$env/static/private' {
 	export const PORT: string;
 	export const SHELL: string;
 	export const npm_command: string;
-	export const COREPACK_ENABLE_AUTO_PIN: string;
 	export const GHOSTTY_BIN_DIR: string;
 	export const npm_config_userconfig: string;
 	export const COLORTERM: string;
@@ -63,8 +62,6 @@ declare module '$env/static/private' {
 	export const XDG_SESSION_TYPE: string;
 	export const npm_config_init_module: string;
 	export const _: string;
-	export const NoDefaultCurrentDirectoryInExePath: string;
-	export const CLAUDECODE: string;
 	export const QT_STYLE_OVERRIDE: string;
 	export const MOTD_SHOWN: string;
 	export const GHOSTTY_SHELL_FEATURES: string;
@@ -94,6 +91,7 @@ declare module '$env/static/private' {
 	export const npm_package_name: string;
 	export const npm_config_prefix: string;
 	export const USER: string;
+	export const GIT_PAGER: string;
 	export const SDL_VIDEODRIVER: string;
 	export const SUDO_EDITOR: string;
 	export const OZONE_PLATFORM: string;
@@ -105,22 +103,22 @@ declare module '$env/static/private' {
 	export const SHLVL: string;
 	export const NVM_CD_FLAGS: string;
 	export const MOZ_ENABLE_WAYLAND: string;
-	export const GIT_EDITOR: string;
+	export const PAGER: string;
 	export const LC_TELEPHONE: string;
 	export const npm_config_fund: string;
 	export const LC_MEASUREMENT: string;
 	export const XDG_VTNR: string;
 	export const XDG_SESSION_ID: string;
 	export const npm_config_user_agent: string;
-	export const OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE: string;
 	export const npm_execpath: string;
 	export const XDG_RUNTIME_DIR: string;
 	export const npm_config_script_shell: string;
-	export const CLAUDE_CODE_ENTRYPOINT: string;
+	export const GEMINI_CLI: string;
 	export const DEBUGINFOD_URLS: string;
 	export const npm_package_json: string;
 	export const LC_TIME: string;
 	export const BUN_INSTALL: string;
+	export const GEMINI_CLI_NO_RELAUNCH: string;
 	export const MISE_SHELL: string;
 	export const XDG_DATA_DIRS: string;
 	export const GDK_BACKEND: string;
@@ -143,7 +141,6 @@ declare module '$env/static/private' {
 	export const GUM_CONFIRM_SELECTED_FOREGROUND: string;
 	export const HYPRCURSOR_SIZE: string;
 	export const TERM_PROGRAM: string;
-	export const NODE_ENV: string;
 }
 
 /**
@@ -177,7 +174,6 @@ declare module '$env/dynamic/private' {
 		PORT: string;
 		SHELL: string;
 		npm_command: string;
-		COREPACK_ENABLE_AUTO_PIN: string;
 		GHOSTTY_BIN_DIR: string;
 		npm_config_userconfig: string;
 		COLORTERM: string;
@@ -210,8 +206,6 @@ declare module '$env/dynamic/private' {
 		XDG_SESSION_TYPE: string;
 		npm_config_init_module: string;
 		_: string;
-		NoDefaultCurrentDirectoryInExePath: string;
-		CLAUDECODE: string;
 		QT_STYLE_OVERRIDE: string;
 		MOTD_SHOWN: string;
 		GHOSTTY_SHELL_FEATURES: string;
@@ -241,6 +235,7 @@ declare module '$env/dynamic/private' {
 		npm_package_name: string;
 		npm_config_prefix: string;
 		USER: string;
+		GIT_PAGER: string;
 		SDL_VIDEODRIVER: string;
 		SUDO_EDITOR: string;
 		OZONE_PLATFORM: string;
@@ -252,22 +247,22 @@ declare module '$env/dynamic/private' {
 		SHLVL: string;
 		NVM_CD_FLAGS: string;
 		MOZ_ENABLE_WAYLAND: string;
-		GIT_EDITOR: string;
+		PAGER: string;
 		LC_TELEPHONE: string;
 		npm_config_fund: string;
 		LC_MEASUREMENT: string;
 		XDG_VTNR: string;
 		XDG_SESSION_ID: string;
 		npm_config_user_agent: string;
-		OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE: string;
 		npm_execpath: string;
 		XDG_RUNTIME_DIR: string;
 		npm_config_script_shell: string;
-		CLAUDE_CODE_ENTRYPOINT: string;
+		GEMINI_CLI: string;
 		DEBUGINFOD_URLS: string;
 		npm_package_json: string;
 		LC_TIME: string;
 		BUN_INSTALL: string;
+		GEMINI_CLI_NO_RELAUNCH: string;
 		MISE_SHELL: string;
 		XDG_DATA_DIRS: string;
 		GDK_BACKEND: string;
@@ -290,7 +285,6 @@ declare module '$env/dynamic/private' {
 		GUM_CONFIRM_SELECTED_FOREGROUND: string;
 		HYPRCURSOR_SIZE: string;
 		TERM_PROGRAM: string;
-		NODE_ENV: string;
 		[key: `PUBLIC_${string}`]: undefined;
 		[key: `${string}`]: string | undefined;
 	}

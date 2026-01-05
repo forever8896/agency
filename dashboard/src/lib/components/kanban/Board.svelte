@@ -13,8 +13,10 @@
 	];
 </script>
 
-<div class="flex gap-4 overflow-x-auto pb-4 px-4">
+<div class="h-full flex gap-6 overflow-x-auto pb-6 px-2 snap-x snap-mandatory">
 	{#each columnOrder as status}
-		<Column {status} tasks={$backlogStore.columns[status] || []} />
+		<div class="snap-start">
+			<Column {status} tasks={$backlogStore.columns[status] || []} />
+		</div>
 	{/each}
 </div>
