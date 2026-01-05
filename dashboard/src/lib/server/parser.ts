@@ -171,7 +171,8 @@ export async function parseHandoffs(dirPath: string): Promise<Handoff[]> {
 				title: titleMatch?.[1] || file.replace('.md', ''),
 				from,
 				to,
-				date: dateMatch?.[1] || ''
+				date: dateMatch?.[1] || '',
+				content
 			});
 		} catch (e) {
 			// Skip files that can't be parsed

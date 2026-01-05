@@ -43,6 +43,7 @@ export interface Handoff {
 	from: string;
 	to: string;
 	date: string;
+	content: string;
 }
 
 export interface DashboardState {

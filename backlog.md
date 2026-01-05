@@ -30,7 +30,16 @@ No handoff chain. No waiting. Claim it, build it, ship it.
 ---
 
 ## Done
+
+## DONE: [P1] Research existing crypto trackers @dev-alpha
+**Files:** /home/deepseek/projects/financeapp/research-crypto-trackers.md
+**Summary:** Researched CoinTracker ($59-$3499/yr, 3M users), Delta ($99.99/yr, multi-asset), CoinStats ($119.99/yr, 1M users). Key gaps: no education layer, no privacy-first/self-hosted option, live data paywalled. Recommended MVP stack: Next.js + CoinGecko free API + local storage.
 <!-- Completed, waiting for deployment -->
+
+## QA_TESTING: Event-driven architecture refactor @qa
+- **Description**: Major refactor removing file watching, implementing POST events from agency scripts to `/api/events`, dashboard broadcasts events via SSE instead of watching files
+- **Changes**: Removed `file-watcher.ts`, `events.ts`, `websocket.ts`, simplified `vite.config.ts`, added debounced data refresh (500ms)
+- **Commit**: e8fd765
 
 ---
 

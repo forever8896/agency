@@ -1,6 +1,10 @@
 <script lang="ts">
 	import { handoffsStore } from '$lib/stores/dashboard';
 	import { AGENT_CONFIG } from '$lib/utils/agent-config';
+	import HandoffModal from './HandoffModal.svelte';
+	import type { Handoff } from '$lib/types';
+
+	let selectedHandoff: Handoff | null = null;
 
 	const agents = Object.keys(AGENT_CONFIG);
 	const centerX = 150;
@@ -76,14 +80,22 @@
     <!-- Simple List -->
     <div class="space-y-2">
         {#each recentHandoffs as handoff (handoff.id)}
-            <div class="flex items-center gap-2 text-xs border-2 border-black bg-white p-2">
+            <button
+                class="w-full flex items-center gap-2 text-xs border-2 border-black bg-white p-2 hover:bg-yellow-100 hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all cursor-pointer text-left"
+                on:click={() => selectedHandoff = handoff}
+            >
                 <span class="font-bold">{handoff.from}</span>
                 <span class="text-gray-400">-></span>
                 <span class="font-bold">{handoff.to}</span>
                 <span class="font-mono text-gray-600 truncate flex-1 border-l border-gray-300 pl-2 ml-2">
                     {handoff.title}
                 </span>
-            </div>
+            </button>
         {/each}
     </div>
 </div>
+
+<HandoffModal
+    handoff={selectedHandoff}
+    onClose={() => selectedHandoff = null}
+/>
