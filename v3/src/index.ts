@@ -81,6 +81,7 @@ async function main() {
     agencyDir: AGENCY_DIR,
     dataDir: DATA_DIR,
     projectsDir: PROJECTS_DIR,
+    autoStart: true, // Enable auto-orchestration by default
   });
 
   // Wire agent events to SSE broadcast
