@@ -55,6 +55,29 @@ export function initializeDatabase(): void {
   const schema = readFileSync(schemaPath, 'utf-8');
   database.exec(schema);
   console.log('Database initialized successfully');
+
+  // Reset all agents to OFFLINE on startup (cleanup from previous sessions)
+  database.exec(`
+    UPDATE agents SET
+      status = 'OFFLINE',
+      current_task_id = NULL,
+      working_on = NULL,
+      pid = NULL,
+      session_id = NULL,
+      blocker = NULL
+    WHERE status != 'OFFLINE'
+  `);
+  console.log('Agent states reset to OFFLINE');
+
+  // Reset IN_PROGRESS tasks back to READY (unclaimed from crashed sessions)
+  database.exec(`
+    UPDATE tasks SET
+      status = 'READY',
+      assigned_to = NULL,
+      claimed_at = NULL
+    WHERE status = 'IN_PROGRESS'
+  `);
+  console.log('Orphaned IN_PROGRESS tasks reset to READY');
 }
 
 export function closeDatabase(): void {
