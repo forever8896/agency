@@ -75,14 +75,15 @@ export const taskQueries = {
     const now = Date.now();
 
     const stmt = database.prepare(`
-      INSERT INTO tasks (id, title, description, priority, size, value_statement, acceptance_criteria, context, review_required, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tasks (id, title, description, status, priority, size, value_statement, acceptance_criteria, context, review_required, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
       id,
       input.title,
       input.description || null,
+      input.status || 'INBOX', // Default to INBOX if not specified
       input.priority || 'P2',
       input.size || 'M',
       input.value_statement || null,

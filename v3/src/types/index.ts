@@ -44,6 +44,7 @@ export interface Task {
 export interface CreateTaskInput {
   title: string;
   description?: string;
+  status?: TaskStatus; // Defaults to INBOX if not specified
   priority?: Priority;
   size?: Size;
   value_statement?: string;

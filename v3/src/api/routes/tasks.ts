@@ -47,6 +47,7 @@ taskRoutes.post('/', (req, res) => {
     const input: CreateTaskInput = {
       title: req.body.title,
       description: req.body.description,
+      status: req.body.status, // Optional: defaults to INBOX
       priority: req.body.priority,
       size: req.body.size,
       value_statement: req.body.value_statement,

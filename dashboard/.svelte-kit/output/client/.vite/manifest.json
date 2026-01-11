@@ -1,0 +1,98 @@
+{
+  ".svelte-kit/generated/client-optimized/app.js": {
+    "file": "_app/immutable/entry/app.DLuElxpL.js",
+    "name": "entry/app",
+    "src": ".svelte-kit/generated/client-optimized/app.js",
+    "isEntry": true,
+    "imports": [
+      "_BORSesdh.js",
+      "_B3wjmNir.js"
+    ],
+    "dynamicImports": [
+      ".svelte-kit/generated/client-optimized/nodes/0.js",
+      ".svelte-kit/generated/client-optimized/nodes/1.js",
+      ".svelte-kit/generated/client-optimized/nodes/2.js"
+    ]
+  },
+  ".svelte-kit/generated/client-optimized/nodes/0.js": {
+    "file": "_app/immutable/nodes/0.qLHCq613.js",
+    "name": "nodes/0",
+    "src": ".svelte-kit/generated/client-optimized/nodes/0.js",
+    "isEntry": true,
+    "isDynamicEntry": true,
+    "imports": [
+      "_BORSesdh.js",
+      "_B3wjmNir.js",
+      "_BbJ15p-K.js"
+    ],
+    "css": [
+      "_app/immutable/assets/0.Bf5q8DRc.css"
+    ]
+  },
+  ".svelte-kit/generated/client-optimized/nodes/1.js": {
+    "file": "_app/immutable/nodes/1.DEWRCKIN.js",
+    "name": "nodes/1",
+    "src": ".svelte-kit/generated/client-optimized/nodes/1.js",
+    "isEntry": true,
+    "isDynamicEntry": true,
+    "imports": [
+      "_BORSesdh.js",
+      "_B3wjmNir.js",
+      "_P95OQn95.js"
+    ]
+  },
+  ".svelte-kit/generated/client-optimized/nodes/2.js": {
+    "file": "_app/immutable/nodes/2.BQ8-8gmY.js",
+    "name": "nodes/2",
+    "src": ".svelte-kit/generated/client-optimized/nodes/2.js",
+    "isEntry": true,
+    "isDynamicEntry": true,
+    "imports": [
+      "_BORSesdh.js",
+      "_B3wjmNir.js",
+      "_BbJ15p-K.js"
+    ]
+  },
+  "_B3wjmNir.js": {
+    "file": "_app/immutable/chunks/B3wjmNir.js",
+    "name": "index",
+    "imports": [
+      "_BORSesdh.js"
+    ]
+  },
+  "_BORSesdh.js": {
+    "file": "_app/immutable/chunks/BORSesdh.js",
+    "name": "scheduler"
+  },
+  "_BbJ15p-K.js": {
+    "file": "_app/immutable/chunks/BbJ15p-K.js",
+    "name": "dashboard",
+    "imports": [
+      "_DpH9poZx.js"
+    ]
+  },
+  "_DpH9poZx.js": {
+    "file": "_app/immutable/chunks/DpH9poZx.js",
+    "name": "index",
+    "imports": [
+      "_BORSesdh.js"
+    ]
+  },
+  "_P95OQn95.js": {
+    "file": "_app/immutable/chunks/P95OQn95.js",
+    "name": "entry",
+    "imports": [
+      "_BORSesdh.js",
+      "_DpH9poZx.js"
+    ]
+  },
+  "node_modules/@sveltejs/kit/src/runtime/client/entry.js": {
+    "file": "_app/immutable/entry/start.DgBdrUKI.js",
+    "name": "entry/start",
+    "src": "node_modules/@sveltejs/kit/src/runtime/client/entry.js",
+    "isEntry": true,
+    "imports": [
+      "_P95OQn95.js"
+    ]
+  }
+}

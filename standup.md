@@ -27,22 +27,22 @@ Real-time status from each squad member. Update when you start/finish work.
 ---
 
 ## dev-alpha
-**Status:** Idle
+**Status:** Available
 **Working on:** --
-**Completed:** Checked backlog - no READY items available
-**Blockers:** None
-**Next:** Waiting for work to be added to backlog
-*Updated: 2025-12-29 18:27*
+**Completed:** Checked backlog, board, and inbox - no READY items to claim
+**Blockers:** None - waiting for PO to add work to backlog
+**Next:** Will claim first available READY item when added
+*Updated: 2026-01-11 03:00*
 
 ---
 
 ## dev-beta
-**Status:** Idle
-**Working on:** --
-**Completed:** --
+**Status:** Building
+**Working on:** OGSnap Production Deployment Checklist (P0)
+**Completed:** Claimed deployment checklist task
 **Blockers:** None
-**Next:** --
-*Updated: --*
+**Next:** Execute pre-flight checklist and production deployment
+*Updated: 2026-01-11 03:04*
 
 ---
 
