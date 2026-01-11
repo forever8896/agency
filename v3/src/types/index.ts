@@ -238,9 +238,11 @@ export type EventType =
   | 'system.shutdown'
   | 'system.error'
   // Orchestrator
-  | 'orchestrator.assigned'
   | 'orchestrator.enabled'
-  | 'orchestrator.disabled';
+  | 'orchestrator.disabled'
+  | 'orchestrator.assigned'
+  | 'orchestrator.wake_po'
+  | 'orchestrator.wake_handoff';
 
 export interface AgencyEvent {
   id: number;

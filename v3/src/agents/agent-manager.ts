@@ -3,7 +3,7 @@
 
 import { EventEmitter } from 'events';
 import { AgentController, ControllerState } from './agent-controller.js';
-import { agentQueries, taskQueries, eventQueries } from '../db/database.js';
+import { agentQueries, taskQueries, eventQueries, handoffQueries } from '../db/database.js';
 import type { Agent } from '../types/index.js';
 
 export interface AgentManagerEvents {
@@ -359,12 +359,95 @@ export class AgentManager extends EventEmitter {
 
   /**
    * Run a single orchestration cycle.
+   * Order of operations:
+   * 1. Wake Product Owner if there are INBOX tasks to triage
+   * 2. Wake agents if there are pending handoffs for them
+   * 3. Assign READY tasks to idle developers
    */
   private async runOrchestrationCycle(): Promise<void> {
     try {
+      // Step 1: Wake PO for INBOX triage
+      await this.wakeProductOwnerForInbox();
+
+      // Step 2: Wake agents for pending handoffs
+      await this.wakeAgentsForHandoffs();
+
+      // Step 3: Assign READY tasks to idle agents
       await this.assignWork();
     } catch (error) {
       console.error('[Orchestrator] Error in orchestration cycle:', error);
+    }
+  }
+
+  /**
+   * Wake Product Owner if there are INBOX tasks waiting to be triaged.
+   */
+  private async wakeProductOwnerForInbox(): Promise<void> {
+    // Check if PO is already running
+    if (this.isRunning('product-owner')) {
+      return;
+    }
+
+    // Check for INBOX tasks
+    const inboxTasks = taskQueries.list({ status: ['INBOX'], limit: 1 });
+    if (inboxTasks.length === 0) {
+      return;
+    }
+
+    // Check if PO agent exists and is available
+    const po = agentQueries.getByName('product-owner');
+    if (!po || (po.status !== 'IDLE' && po.status !== 'OFFLINE')) {
+      return;
+    }
+
+    console.log(`[Orchestrator] Waking product-owner to triage ${inboxTasks.length}+ INBOX tasks`);
+
+    try {
+      // Start PO without a specific task - PO will read INBOX
+      await this.startAgent('product-owner');
+
+      eventQueries.create('orchestrator.wake_po', {
+        agentName: 'product-owner',
+        message: `Woke product-owner to triage INBOX tasks`,
+        data: { inboxCount: inboxTasks.length },
+      });
+    } catch (error) {
+      console.error('[Orchestrator] Failed to wake product-owner:', error);
+    }
+  }
+
+  /**
+   * Wake agents that have pending handoffs addressed to them.
+   */
+  private async wakeAgentsForHandoffs(): Promise<void> {
+    // Get all pending handoffs
+    const pendingHandoffs = handoffQueries.list({ status: 'PENDING' });
+
+    for (const handoff of pendingHandoffs) {
+      // Skip if no specific target agent
+      if (!handoff.to_agent) continue;
+
+      // Skip if target agent is already running
+      if (this.isRunning(handoff.to_agent)) continue;
+
+      // Check if agent exists and is available
+      const agent = agentQueries.getByName(handoff.to_agent);
+      if (!agent || (agent.status !== 'IDLE' && agent.status !== 'OFFLINE')) continue;
+
+      console.log(`[Orchestrator] Waking ${handoff.to_agent} for handoff: ${handoff.title}`);
+
+      try {
+        // Start agent - it will see the handoff in its context
+        await this.startAgent(handoff.to_agent);
+
+        eventQueries.create('orchestrator.wake_handoff', {
+          agentName: handoff.to_agent,
+          handoffId: handoff.id,
+          message: `Woke ${handoff.to_agent} for handoff: ${handoff.title}`,
+        });
+      } catch (error) {
+        console.error(`[Orchestrator] Failed to wake ${handoff.to_agent}:`, error);
+      }
     }
   }
 
