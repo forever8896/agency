@@ -10,26 +10,31 @@ interface CommunicationDockProps {
   className?: string;
 }
 
-type TabType = 'inbox' | 'backlog' | 'handoffs';
+type TabType = 'inbox' | 'backlog' | 'active' | 'handoffs';
 
 export function CommunicationDock({ tasks, handoffs, onTaskClick, className = '' }: CommunicationDockProps) {
   const [isExpanded, setIsExpanded] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabType>('inbox');
+  const [activeTab, setActiveTab] = useState<TabType>('active');
 
   // Filter tasks by status
   const inboxTasks = tasks.filter(t => t.status === 'INBOX');
   const backlogTasks = tasks.filter(t => t.status === 'READY');
+  // Active = IN_PROGRESS, DONE, QA_TESTING, REVIEWING (work in flight)
+  const activeTasks = tasks.filter(t =>
+    ['IN_PROGRESS', 'DONE', 'QA_TESTING', 'QA_PASSED', 'REVIEWING', 'REVIEWED'].includes(t.status)
+  );
   const pendingHandoffs = handoffs.filter(h => h.status === 'PENDING' || h.status === 'CLAIMED');
 
   const tabs: { id: TabType; label: string; count: number; color: string }[] = [
-    { id: 'inbox', label: 'Inbox', count: inboxTasks.length, color: 'bg-purple-500' },
+    { id: 'active', label: 'Active', count: activeTasks.length, color: 'bg-green-500' },
     { id: 'backlog', label: 'Backlog', count: backlogTasks.length, color: 'bg-blue-500' },
+    { id: 'inbox', label: 'Inbox', count: inboxTasks.length, color: 'bg-purple-500' },
     { id: 'handoffs', label: 'Handoffs', count: pendingHandoffs.length, color: 'bg-orange-500' },
   ];
 
   return (
     <div className={`absolute left-4 top-20 ${className}`}>
-      <div className="bg-[#12121a]/95 backdrop-blur-sm border border-[#2a2a3a] rounded-lg overflow-hidden shadow-xl" style={{ width: isExpanded ? '320px' : '48px' }}>
+      <div className="bg-[#12121a]/95 backdrop-blur-sm border border-[#2a2a3a] rounded-lg overflow-hidden shadow-xl" style={{ width: isExpanded ? '360px' : '48px' }}>
         {/* Header / Toggle */}
         <div
           className="flex items-center justify-between px-3 py-2 border-b border-[#2a2a3a] cursor-pointer hover:bg-[#1a1a24]"
@@ -85,6 +90,9 @@ export function CommunicationDock({ tasks, handoffs, onTaskClick, className = ''
 
             {/* Content */}
             <div className="max-h-80 overflow-y-auto">
+              {activeTab === 'active' && (
+                <ActivePanel tasks={activeTasks} onTaskClick={onTaskClick} />
+              )}
               {activeTab === 'inbox' && (
                 <InboxPanel tasks={inboxTasks} onTaskClick={onTaskClick} />
               )}
@@ -98,6 +106,84 @@ export function CommunicationDock({ tasks, handoffs, onTaskClick, className = ''
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+// Active Panel - Shows tasks in progress with assignments
+function ActivePanel({ tasks, onTaskClick }: { tasks: Task[]; onTaskClick: (task: Task) => void }) {
+  if (tasks.length === 0) {
+    return (
+      <div className="p-4 text-center text-gray-500 text-sm">
+        <div className="mb-2">🔄</div>
+        No active work
+      </div>
+    );
+  }
+
+  // Group by status for clear workflow visualization
+  const byStatus: Record<string, Task[]> = {};
+  for (const task of tasks) {
+    if (!byStatus[task.status]) byStatus[task.status] = [];
+    byStatus[task.status].push(task);
+  }
+
+  const statusOrder = ['IN_PROGRESS', 'DONE', 'QA_TESTING', 'QA_PASSED', 'REVIEWING', 'REVIEWED'];
+  const statusLabels: Record<string, { label: string; color: string; icon: string }> = {
+    'IN_PROGRESS': { label: 'In Progress', color: 'bg-blue-500', icon: '🔨' },
+    'DONE': { label: 'Dev Complete', color: 'bg-green-500', icon: '✅' },
+    'QA_TESTING': { label: 'QA Testing', color: 'bg-yellow-500', icon: '🧪' },
+    'QA_PASSED': { label: 'QA Passed', color: 'bg-emerald-500', icon: '✓' },
+    'REVIEWING': { label: 'In Review', color: 'bg-purple-500', icon: '👁' },
+    'REVIEWED': { label: 'Reviewed', color: 'bg-indigo-500', icon: '✓✓' },
+  };
+
+  return (
+    <div className="p-2 space-y-3">
+      {statusOrder.map(status => {
+        const statusTasks = byStatus[status] || [];
+        if (statusTasks.length === 0) return null;
+
+        const info = statusLabels[status] || { label: status, color: 'bg-gray-500', icon: '•' };
+
+        return (
+          <div key={status}>
+            <div className="flex items-center gap-2 mb-1.5 px-1">
+              <span className={`w-2 h-2 rounded-full ${info.color}`} />
+              <span className="text-xs font-medium text-gray-400">{info.label}</span>
+              <span className="text-xs text-gray-600">({statusTasks.length})</span>
+            </div>
+            <div className="space-y-1.5">
+              {statusTasks.map(task => (
+                <div
+                  key={task.id}
+                  onClick={() => onTaskClick(task)}
+                  className="p-2 rounded bg-[#1a1a24] hover:bg-[#252532] cursor-pointer border border-[#2a2a3a] transition-colors"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${getPriorityColor(task.priority)}`}>
+                      {task.priority}
+                    </span>
+                    {task.assigned_to && (
+                      <span className="text-xs bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">
+                        {task.assigned_to}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-sm text-gray-200 line-clamp-1">
+                    {task.title}
+                  </div>
+                  {task.summary && (
+                    <div className="text-xs text-gray-500 line-clamp-1 mt-1">
+                      {task.summary}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

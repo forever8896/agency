@@ -69,15 +69,8 @@ export function initializeDatabase(): void {
   `);
   console.log('Agent states reset to OFFLINE');
 
-  // Reset IN_PROGRESS tasks back to READY (unclaimed from crashed sessions)
-  database.exec(`
-    UPDATE tasks SET
-      status = 'READY',
-      assigned_to = NULL,
-      claimed_at = NULL
-    WHERE status = 'IN_PROGRESS'
-  `);
-  console.log('Orphaned IN_PROGRESS tasks reset to READY');
+  // Note: We don't reset IN_PROGRESS tasks - they remain visible
+  // so users can see what was being worked on and manually reassign if needed
 }
 
 export function closeDatabase(): void {

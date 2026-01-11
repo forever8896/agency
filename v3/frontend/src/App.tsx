@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { getTasks, getAgents, getDashboardSummary, getHandoffs, connectSSE } from './api';
 import type { Task, Agent, DashboardSummary, SSEEvent, AgentOutputData, Handoff } from './types';
 import { OfficeView } from './components/office/OfficeView';
@@ -15,6 +15,31 @@ export interface AgentOutput {
 // Per-agent output storage
 export type AgentOutputMap = Map<string, AgentOutput[]>;
 
+// Throttle helper
+function useThrottledCallback<T extends (...args: unknown[]) => void>(
+  callback: T,
+  delay: number
+): T {
+  const lastRun = useRef(Date.now());
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  return useCallback((...args: unknown[]) => {
+    const now = Date.now();
+    const elapsed = now - lastRun.current;
+
+    if (elapsed >= delay) {
+      lastRun.current = now;
+      callback(...args);
+    } else if (!timeoutRef.current) {
+      timeoutRef.current = setTimeout(() => {
+        lastRun.current = Date.now();
+        timeoutRef.current = null;
+        callback(...args);
+      }, delay - elapsed);
+    }
+  }, [callback, delay]) as T;
+}
+
 function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -28,6 +53,10 @@ function App() {
   const [agentOutputMap, setAgentOutputMap] = useState<AgentOutputMap>(new Map());
   // Legacy: combined outputs for global view
   const [agentOutputs, setAgentOutputs] = useState<AgentOutput[]>([]);
+
+  // Buffer for batching output updates (reduces re-renders)
+  const outputBufferRef = useRef<Map<string, AgentOutput[]>>(new Map());
+  const globalBufferRef = useRef<AgentOutput[]>([]);
 
   // Fetch initial data
   const fetchData = useCallback(async () => {
@@ -52,9 +81,38 @@ function App() {
     }
   }, []);
 
+  // Flush buffered outputs to state (throttled to reduce re-renders)
+  const flushOutputBuffers = useCallback(() => {
+    // Flush per-agent buffers
+    if (outputBufferRef.current.size > 0) {
+      setAgentOutputMap(prev => {
+        const newMap = new Map(prev);
+        for (const [agentName, newOutputs] of outputBufferRef.current) {
+          const existing = newMap.get(agentName) || [];
+          // Keep last 100 outputs per agent (reduced for performance)
+          newMap.set(agentName, [...existing, ...newOutputs].slice(-100));
+        }
+        return newMap;
+      });
+      outputBufferRef.current.clear();
+    }
+
+    // Flush global buffer
+    if (globalBufferRef.current.length > 0) {
+      setAgentOutputs(prev => [...prev, ...globalBufferRef.current].slice(-50));
+      globalBufferRef.current = [];
+    }
+  }, []);
+
+  // Throttled data fetch (max once per 2 seconds)
+  const throttledFetchData = useThrottledCallback(fetchData, 2000);
+
   // Connect to SSE for real-time updates
   useEffect(() => {
     fetchData();
+
+    // Flush output buffers every 200ms for smooth updates without lag
+    const flushInterval = setInterval(flushOutputBuffers, 200);
 
     const eventSource = connectSSE((event: unknown) => {
       const sseEvent = event as SSEEvent;
@@ -65,26 +123,25 @@ function App() {
         setTasks(sseEvent.data.tasks);
         setAgents(sseEvent.data.agents);
       } else if (sseEvent.type === 'event') {
-        // Refresh data on events
-        fetchData();
+        // Throttled refresh on events
+        throttledFetchData();
       } else if (sseEvent.type === 'agent:output') {
-        // Handle agent output streaming
+        // Buffer agent outputs instead of immediate state update
         const outputData = sseEvent.data as AgentOutputData;
         const agentName = outputData.agent;
 
-        // Process each event
-        for (const event of outputData.events) {
+        for (const evt of outputData.events) {
           let content = '';
           let outputType: 'content' | 'tool' | 'system' = 'content';
 
-          if (event.type === 'content' && event.content) {
-            content = event.content;
+          if (evt.type === 'content' && evt.content) {
+            content = evt.content;
             outputType = 'content';
-          } else if (event.type === 'tool_use' && event.name) {
-            content = `🔧 Using tool: ${event.name}`;
+          } else if (evt.type === 'tool_use' && evt.name) {
+            content = `🔧 ${evt.name}`;
             outputType = 'tool';
-          } else if (event.type === 'system' && event.content) {
-            content = `⚙️ ${event.content}`;
+          } else if (evt.type === 'system' && evt.content) {
+            content = `⚙️ ${evt.content}`;
             outputType = 'system';
           }
 
@@ -96,33 +153,25 @@ function App() {
               type: outputType,
             };
 
-            // Update per-agent output map
-            setAgentOutputMap(prev => {
-              const newMap = new Map(prev);
-              const agentOutputs = newMap.get(agentName) || [];
-              // Keep last 200 outputs per agent
-              newMap.set(agentName, [...agentOutputs.slice(-199), newOutput]);
-              return newMap;
-            });
-
-            // Also update global outputs for combined view
-            setAgentOutputs(prev => {
-              // Keep last 100 outputs globally
-              return [...prev.slice(-99), newOutput];
-            });
+            // Add to buffers (will be flushed periodically)
+            const agentBuffer = outputBufferRef.current.get(agentName) || [];
+            agentBuffer.push(newOutput);
+            outputBufferRef.current.set(agentName, agentBuffer);
+            globalBufferRef.current.push(newOutput);
           }
         }
       } else if (sseEvent.type === 'agent:state') {
-        // Agent state changed - refresh agent list
-        fetchData();
+        // Throttled refresh on agent state change
+        throttledFetchData();
       }
     });
 
     return () => {
+      clearInterval(flushInterval);
       eventSource.close();
       setConnected(false);
     };
-  }, [fetchData]);
+  }, [fetchData, flushOutputBuffers, throttledFetchData]);
 
   const handleTaskCreated = (task: Task) => {
     setTasks(prev => [task, ...prev]);
