@@ -16,8 +16,10 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || 'localhost';
 
 // Determine paths
-// From v3/src (or v3/dist), go up 2 levels to agency-public/
-const AGENCY_DIR = process.env.AGENCY_DIR || resolve(__dirname, '../..');
+// AGENCY_DIR: v3/ directory (one level up from dist/) - contains agents/ with AGENT.md files
+// DATA_DIR: v3/data/ - contains SQLite database
+// PROJECTS_DIR: Root of workspace where agents do their work
+const AGENCY_DIR = process.env.AGENCY_DIR || resolve(__dirname, '..');
 const DATA_DIR = process.env.DATA_DIR || resolve(__dirname, '../data');
 const PROJECTS_DIR = process.env.PROJECTS_DIR || resolve(__dirname, '../../..');
 
