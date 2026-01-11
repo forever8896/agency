@@ -10,8 +10,8 @@ A visual web-based platform for orchestrating teams of Claude Code agents. Creat
 │  ┌─────────────────────────────────────────────────────────────────────────┐│
 │  │                     React Dashboard (port 5173)                          ││
 │  │  ┌──────────────┐  ┌──────────────┐  ┌────────────────────────────────┐ ││
-│  │  │ Kanban Board │  │ Agent Panel  │  │ Task Creation / Detail Modal  │ ││
-│  │  │  (6 columns) │  │ (8 agents)   │  │ (view, edit, transition)      │ ││
+│  │  │  3D Office   │  │ Agent Panel  │  │ Communication Dock             │ ││
+│  │  │  (Three.js)  │  │ (8 agents)   │  │ (Inbox/Backlog/Handoffs)       │ ││
 │  │  └──────────────┘  └──────────────┘  └────────────────────────────────┘ ││
 │  └──────────────────────────────────┬──────────────────────────────────────┘│
 └─────────────────────────────────────┼───────────────────────────────────────┘
@@ -168,18 +168,27 @@ v3/
 │   └── types/
 │       └── index.ts              # TypeScript types
 │
-├── frontend/                     # Frontend (React + Vite + Tailwind)
+├── frontend/                     # Frontend (React + Vite + Three.js + Tailwind)
 │   └── src/
-│       ├── App.tsx               # Main app with SSE connection
+│       ├── App.tsx               # Main app with SSE connection + per-agent output map
 │       ├── api.ts                # API client
 │       ├── types.ts              # Frontend types
 │       └── components/
 │           ├── Header.tsx        # Top bar with stats
-│           ├── KanbanBoard.tsx   # Task columns
+│           ├── KanbanBoard.tsx   # Task columns (alternative view)
 │           ├── TaskCard.tsx      # Individual task card
 │           ├── TaskModal.tsx     # Task detail/edit modal
 │           ├── CreateTaskModal.tsx # New task form
-│           └── AgentPanel.tsx    # Agent list with controls
+│           ├── AgentPanel.tsx    # Agent list with controls
+│           └── office/           # 3D Isometric Office View
+│               ├── OfficeView.tsx       # Main composition (Canvas + overlays)
+│               ├── IsometricOffice.tsx  # Three.js 3D scene
+│               ├── AgentCharacter.tsx   # 3D agent representation
+│               ├── AgentDetailPanel.tsx # Agent info + live output stream
+│               ├── AgentConsole.tsx     # Global output stream
+│               ├── CommunicationDock.tsx # Inbox/Backlog/Handoffs tabs
+│               ├── TaskDetailPanel.tsx  # Task info panel
+│               └── TaskObject.tsx       # 3D task representation
 │
 ├── data/
 │   └── agency.db                 # SQLite database
@@ -275,7 +284,9 @@ The system comes with 8 pre-configured agents:
 
 ## Key Features
 
-- **Visual Task Management**: Kanban board with drag-and-drop (coming soon)
+- **3D Isometric Office**: Visual workspace with Three.js - see agents and tasks in a virtual office
+- **Agent-Specific Streaming**: Click any agent to see their live output stream in real-time
+- **Communication Dock**: Tabbed panel showing Inbox (untriaged), Backlog (ready), and Handoffs (agent-to-agent messages)
 - **Agent Control**: Start/stop/pause/resume any agent from the UI
 - **Auto-Orchestration**: Toggle automatic agent assignment (agents pick up READY tasks)
 - **Message Injection**: Interrupt an agent mid-work with new instructions
@@ -292,3 +303,22 @@ The system comes with 8 pre-configured agents:
 | DATABASE_PATH | ./data/agency.db | SQLite database path |
 | AGENCY_DIR | (auto) | Path to agent definitions |
 | PROJECTS_DIR | (auto) | Working directory for agents |
+
+## Running Multiple Instances
+
+You can run separate agency instances for different projects:
+
+```bash
+# Project A on port 3000
+DATABASE_PATH=./data/project-a.db PORT=3000 npm run dev
+
+# Project B on port 3001 (in another terminal)
+DATABASE_PATH=./data/project-b.db PORT=3001 npm run dev
+```
+
+Each instance gets its own:
+- SQLite database (tasks, agents, handoffs, events)
+- Agent sessions and conversation history
+- Frontend on a different port
+
+Note: The `data/` directory is auto-created on first run. Database files (`*.db`) are gitignored - each clone starts fresh.
