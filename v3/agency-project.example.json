@@ -1,0 +1,24 @@
+{
+  "name": "My Project",
+  "description": "Brief description of what this project does and its purpose.",
+  "techStack": [
+    "TypeScript",
+    "React",
+    "Node.js",
+    "SQLite"
+  ],
+  "keyDirectories": {
+    "src": "src",
+    "contracts": "contracts",
+    "frontend": "frontend",
+    "backend": "backend",
+    "tests": "tests",
+    "docs": "docs"
+  },
+  "currentFocus": "Building the core feature set",
+  "notes": [
+    "Use ESM imports (import/export, not require)",
+    "Run 'npm test' before completing any task",
+    "API server runs on port 3000"
+  ]
+}

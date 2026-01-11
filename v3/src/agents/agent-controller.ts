@@ -8,6 +8,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { v4 as uuid } from 'uuid';
 import { StreamParser, StreamEvent } from './stream-parser.js';
+import { buildAgentContext, formatContextAsMarkdown } from './context-builder.js';
 import {
   agentQueries,
   sessionQueries,
@@ -407,6 +408,19 @@ export class AgentController extends EventEmitter {
       throw new Error(`Could not read agent definition: ${agentMdPath}`);
     }
 
+    // Get agent type from database
+    const agentRecord = agentQueries.getByName(this.agentName);
+    const agentType = agentRecord?.type || 'unknown';
+
+    // Build rich context from project config and recent work
+    const context = buildAgentContext(
+      this.agentName,
+      agentType,
+      this.projectsDir,
+      this.taskId
+    );
+    const contextMarkdown = formatContextAsMarkdown(context);
+
     // Add runtime context
     prompt += `
 
@@ -417,6 +431,8 @@ export class AgentController extends EventEmitter {
 - **Projects Directory:** ${this.projectsDir}
 - **Current Time:** ${new Date().toISOString()}
 - **Session ID:** ${this.claudeSessionId}
+
+${contextMarkdown}
 
 ## API Integration
 
@@ -436,15 +452,20 @@ The orchestrator can inject messages at any time. When you receive a new user me
 3. Do NOT continue previous work unless told to resume
 `;
 
-    // Add task context if available
-    if (this.taskId) {
+    // Add task-specific context if available
+    if (this.taskId && context.currentTask) {
       prompt += `
 
-## Current Task
+## Your Assignment
 
-You have been assigned task ID: ${this.taskId}
-
+You have been assigned to work on task ${this.taskId}. The task details are shown above.
 Please claim this task via the API and begin work immediately.
+
+${agentType === 'qa' ? `
+### QA Notes
+Review the "Recent Work" section above to understand what the developer implemented.
+Check the files_changed list to know which files to test.
+` : ''}
 `;
     }
 
