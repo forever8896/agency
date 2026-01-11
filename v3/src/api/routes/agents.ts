@@ -84,7 +84,7 @@ agentRoutes.post('/orchestration/disable', (_req, res) => {
 agentRoutes.post('/orchestration/run', async (_req, res) => {
   try {
     const manager = getAgentManager();
-    await manager.assignWork();
+    await manager.runOrchestration();
 
     res.json({
       success: true,

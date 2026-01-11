@@ -235,50 +235,150 @@ export class AgentManager extends EventEmitter {
   }
 
   /**
-   * Find available work and assign to idle agents.
+   * Manually trigger an orchestration cycle.
+   * Useful for API endpoints or testing.
    */
-  async assignWork(): Promise<void> {
-    // Get available agents (not currently running)
+  async runOrchestration(): Promise<void> {
+    await this.runOrchestrationCycle();
+  }
+
+  /**
+   * Assign READY tasks to available developers only.
+   */
+  private async assignDevelopers(): Promise<void> {
+    // Get available developer agents (type = 'developer')
     const agents = agentQueries.getAll();
-    const availableAgents = agents.filter(a => {
-      // Agent must be idle or offline in DB (not working/blocked) and not have a running controller
-      // OFFLINE means not started yet, IDLE means started but not working
+    const availableDevelopers = agents.filter(a => {
+      if (a.type !== 'developer') return false;
       if (a.status !== 'IDLE' && a.status !== 'OFFLINE') return false;
       return !this.isRunning(a.name);
     });
 
-    if (availableAgents.length === 0) {
+    if (availableDevelopers.length === 0) {
       return;
     }
 
-    // Get ready tasks
-    const readyTasks = taskQueries.list({ status: 'READY', limit: availableAgents.length });
+    // Get READY tasks
+    const readyTasks = taskQueries.list({ status: 'READY', limit: availableDevelopers.length });
 
     if (readyTasks.length === 0) {
       return;
     }
 
-    console.log(`[Orchestrator] Found ${readyTasks.length} ready tasks, ${availableAgents.length} available agents`);
+    console.log(`[Orchestrator] Found ${readyTasks.length} READY tasks, ${availableDevelopers.length} available developers`);
 
-    // Assign tasks to agents
-    for (let i = 0; i < Math.min(availableAgents.length, readyTasks.length); i++) {
-      const agent = availableAgents[i];
+    // Assign tasks to developers
+    for (let i = 0; i < Math.min(availableDevelopers.length, readyTasks.length); i++) {
+      const dev = availableDevelopers[i];
       const task = readyTasks[i];
 
-      console.log(`[Orchestrator] Assigning task "${task.title}" to agent ${agent.name}`);
+      console.log(`[Orchestrator] Assigning "${task.title}" to ${dev.name}`);
 
       try {
-        // Start agent with task
-        await this.startAgent(agent.name, task.id);
+        await this.startAgent(dev.name, task.id);
 
         eventQueries.create('orchestrator.assigned', {
-          agentName: agent.name,
+          agentName: dev.name,
           taskId: task.id,
-          message: `Auto-assigned task "${task.title}" to ${agent.name}`,
+          message: `Assigned "${task.title}" to ${dev.name}`,
         });
       } catch (error) {
-        console.error(`[Orchestrator] Failed to start agent ${agent.name}:`, error);
+        console.error(`[Orchestrator] Failed to start ${dev.name}:`, error);
       }
+    }
+  }
+
+  /**
+   * Wake QA agent when there are DONE tasks waiting for testing.
+   */
+  private async wakeQAForTesting(): Promise<void> {
+    if (this.isRunning('qa')) return;
+
+    const doneTasks = taskQueries.list({ status: 'DONE', limit: 1 });
+    if (doneTasks.length === 0) return;
+
+    const qa = agentQueries.getByName('qa');
+    if (!qa || (qa.status !== 'IDLE' && qa.status !== 'OFFLINE')) return;
+
+    console.log(`[Orchestrator] Waking QA for ${doneTasks.length}+ DONE tasks`);
+
+    try {
+      await this.startAgent('qa', doneTasks[0].id);
+
+      eventQueries.create('orchestrator.assigned', {
+        agentName: 'qa',
+        taskId: doneTasks[0].id,
+        message: `Woke QA to test "${doneTasks[0].title}"`,
+      });
+    } catch (error) {
+      console.error('[Orchestrator] Failed to wake QA:', error);
+    }
+  }
+
+  /**
+   * Wake Reviewer when there are QA_PASSED tasks that require review.
+   */
+  private async wakeReviewerForReview(): Promise<void> {
+    if (this.isRunning('reviewer')) return;
+
+    // Get QA_PASSED tasks that require review
+    const passedTasks = taskQueries.list({ status: 'QA_PASSED', limit: 10 });
+    const needsReview = passedTasks.filter(t => t.review_required);
+
+    if (needsReview.length === 0) return;
+
+    const reviewer = agentQueries.getByName('reviewer');
+    if (!reviewer || (reviewer.status !== 'IDLE' && reviewer.status !== 'OFFLINE')) return;
+
+    console.log(`[Orchestrator] Waking Reviewer for ${needsReview.length} tasks needing review`);
+
+    try {
+      await this.startAgent('reviewer', needsReview[0].id);
+
+      eventQueries.create('orchestrator.assigned', {
+        agentName: 'reviewer',
+        taskId: needsReview[0].id,
+        message: `Woke Reviewer to review "${needsReview[0].title}"`,
+      });
+    } catch (error) {
+      console.error('[Orchestrator] Failed to wake Reviewer:', error);
+    }
+  }
+
+  /**
+   * Wake DevOps when there are tasks ready to ship.
+   * - REVIEWED tasks (passed code review)
+   * - QA_PASSED tasks that don't require review
+   */
+  private async wakeDevOpsForShipping(): Promise<void> {
+    if (this.isRunning('devops')) return;
+
+    // Get REVIEWED tasks
+    const reviewedTasks = taskQueries.list({ status: 'REVIEWED', limit: 5 });
+
+    // Get QA_PASSED tasks that don't require review
+    const passedTasks = taskQueries.list({ status: 'QA_PASSED', limit: 5 });
+    const noReviewNeeded = passedTasks.filter(t => !t.review_required);
+
+    const shippable = [...reviewedTasks, ...noReviewNeeded];
+
+    if (shippable.length === 0) return;
+
+    const devops = agentQueries.getByName('devops');
+    if (!devops || (devops.status !== 'IDLE' && devops.status !== 'OFFLINE')) return;
+
+    console.log(`[Orchestrator] Waking DevOps for ${shippable.length} tasks ready to ship`);
+
+    try {
+      await this.startAgent('devops', shippable[0].id);
+
+      eventQueries.create('orchestrator.assigned', {
+        agentName: 'devops',
+        taskId: shippable[0].id,
+        message: `Woke DevOps to ship "${shippable[0].title}"`,
+      });
+    } catch (error) {
+      console.error('[Orchestrator] Failed to wake DevOps:', error);
     }
   }
 
@@ -359,10 +459,13 @@ export class AgentManager extends EventEmitter {
 
   /**
    * Run a single orchestration cycle.
-   * Order of operations:
-   * 1. Wake Product Owner if there are INBOX tasks to triage
-   * 2. Wake agents if there are pending handoffs for them
-   * 3. Assign READY tasks to idle developers
+   * Matches agent roles to task workflow stages:
+   *
+   * INBOX → Product Owner → READY
+   * READY → Developers → IN_PROGRESS → DONE
+   * DONE → QA → QA_PASSED/QA_FAILED
+   * QA_PASSED (review_required) → Reviewer → REVIEWED
+   * REVIEWED or QA_PASSED → DevOps → SHIPPED
    */
   private async runOrchestrationCycle(): Promise<void> {
     try {
@@ -372,8 +475,17 @@ export class AgentManager extends EventEmitter {
       // Step 2: Wake agents for pending handoffs
       await this.wakeAgentsForHandoffs();
 
-      // Step 3: Assign READY tasks to idle agents
-      await this.assignWork();
+      // Step 3: Assign READY tasks to developers
+      await this.assignDevelopers();
+
+      // Step 4: Wake QA for DONE tasks
+      await this.wakeQAForTesting();
+
+      // Step 5: Wake Reviewer for QA_PASSED tasks needing review
+      await this.wakeReviewerForReview();
+
+      // Step 6: Wake DevOps for shipping
+      await this.wakeDevOpsForShipping();
     } catch (error) {
       console.error('[Orchestrator] Error in orchestration cycle:', error);
     }
